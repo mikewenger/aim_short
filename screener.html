@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIM Stock Screener</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3350; --text: #e2e8f0; --muted: #8892b0;
+    --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+    --yellow: #f59e0b; --purple: #8b5cf6;
+    --green-dim: #064e3b; --red-dim: #450a0a; --blue-dim: #1e3a8a;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header h1 span { color: var(--blue); }
+  header .subtitle { color: var(--muted); font-size: 12px; }
+  .badge { background: var(--blue-dim); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .back-link { color: var(--muted); font-size: 12px; text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 5px; }
+  .back-link:hover { color: var(--text); border-color: var(--blue); }
+
+  .page { max-width: 1260px; margin: 0 auto; padding: 24px; }
+
+  /* TRADING HOURS STATUS BAR */
+  .trading-bar { display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .trading-status { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+  .trading-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.5s infinite; }
+  .dot-closed { background: var(--muted); }
+  .dot-scanning { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .trading-time { font-size: 12px; color: var(--muted); margin-left: auto; font-family: monospace; }
+  .countdown { font-size: 12px; color: var(--yellow); font-family: monospace; }
+  .scan-count { font-size: 12px; color: var(--muted); }
+  .scan-count b { color: var(--text); }
+
+  /* AUTO-SCAN TOGGLE */
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .toggle { position: relative; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; cursor: pointer; transition: 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
+  .toggle input:checked + .toggle-slider { background: var(--green-dim); border-color: var(--green); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: var(--green); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #2563eb; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--blue); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  /* PERFECT STOCK ALERT */
+  .perfect-alert { display: none; background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05)); border: 2px solid var(--green); border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; }
+  .perfect-alert .alert-title { font-size: 13px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .perfect-cards { display: flex; gap: 10px; flex-wrap: wrap; }
+  .perfect-card { background: var(--surface); border: 1px solid rgba(16,185,129,0.4); border-radius: 8px; padding: 12px 16px; min-width: 160px; cursor: pointer; transition: border-color 0.15s; }
+  .perfect-card:hover { border-color: var(--green); }
+  .perfect-card .pc-ticker { font-size: 18px; font-weight: 800; color: var(--green); }
+  .perfect-card .pc-name { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .perfect-card .pc-score { font-size: 11px; }
+
+  /* PROGRESS */
+  .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; display: none; }
+  .progress-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+  .progress-bar-fill { background: var(--blue); height: 100%; border-radius: 4px; transition: width 0.3s; width: 0%; }
+  .progress-stats { display: flex; gap: 20px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .progress-stats b { color: var(--text); }
+
+  /* SCAN LOG */
+  .scan-log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; display: none; max-height: 160px; overflow-y: auto; }
+  .scan-log-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  .log-entry { font-size: 12px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { font-family: monospace; white-space: nowrap; color: var(--muted); }
+  .log-msg { color: var(--text); }
+  .log-perfect { color: var(--green); font-weight: 600; }
+  .log-warn { color: var(--yellow); }
+
+  /* ALERT */
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+
+  /* RESULTS */
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .results-count { font-size: 13px; color: var(--muted); }
+  .results-count b { color: var(--text); }
+
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 980px; }
+  th { background: var(--surface2); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 8px 10px; text-align: right; white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none; z-index: 2; }
+  th:hover { color: var(--text); }
+  th:first-child { text-align: left; }
+  th .sort-icon { display: inline-block; margin-left: 4px; opacity: 0.4; }
+  th.sorted .sort-icon { opacity: 1; color: var(--blue); }
+  td { padding: 8px 10px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+  td:first-child { text-align: left; }
+  tr:hover td { background: var(--surface2); }
+  tr.perfect-row td { background: rgba(16,185,129,0.05); }
+  tr.perfect-row:hover td { background: rgba(16,185,129,0.1); }
+  tr.new-row td { animation: fadeIn 0.6s ease; }
+  @keyframes fadeIn { from { background: rgba(59,130,246,0.15); } to {} }
+
+  .score-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .score-bar { width: 60px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; }
+  .score-A { background: var(--green); }
+  .score-B { background: #84cc16; }
+  .score-C { background: var(--yellow); }
+  .score-D { background: var(--red); }
+
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; }
+  .tag-green { background: var(--green-dim); color: var(--green); }
+  .tag-red { background: var(--red-dim); color: var(--red); }
+  .tag-muted { background: var(--surface2); color: var(--muted); }
+  .tag-new { background: rgba(59,130,246,0.2); color: var(--blue); }
+
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+
+  .ticker-link { font-weight: 700; color: var(--blue); text-decoration: none; font-size: 13px; }
+  .ticker-link:hover { text-decoration: underline; }
+  .company-name { font-size: 11px; color: var(--muted); display: block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .load-btn { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16,185,129,0.3); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .load-btn:hover { background: rgba(16,185,129,0.2); }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot-sm { width: 8px; height: 8px; border-radius: 50%; }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AIM <span>Screener</span></h1>
+    <div class="subtitle">Lichello-Compatible Stock Finder · Massive Real-Time Feed · 7am–8pm EST</div>
+  </div>
+  <a href="index.html" class="back-link">← AIM Tracker</a>
+  <span class="badge">v2.0</span>
+</header>
+
+<div class="page">
+
+  <!-- TRADING HOURS STATUS BAR -->
+  <div class="trading-bar">
+    <div class="trading-status">
+      <div class="trading-dot dot-closed" id="tradingDot"></div>
+      <span id="tradingStatus">Checking trading hours...</span>
+    </div>
+    <div class="toggle-wrap">
+      <label class="toggle">
+        <input type="checkbox" id="autoScanToggle" onchange="toggleAutoScan()">
+        <span class="toggle-slider"></span>
+      </label>
+      <span id="autoScanLabel">Auto-scan OFF</span>
+    </div>
+    <div class="field" style="margin:0;min-width:140px">
+      <select id="scanInterval" style="padding:4px 8px;font-size:12px">
+        <option value="10" selected>Every 10 min</option>
+        <option value="15">Every 15 min</option>
+        <option value="30">Every 30 min</option>
+        <option value="60">Every 1 hour</option>
+      </select>
+    </div>
+    <div class="countdown" id="countdownDisplay" style="display:none"></div>
+    <div class="scan-count" id="scanCountDisplay"></div>
+    <div class="trading-time" id="estClock"></div>
+  </div>
+
+  <!-- CONFIG CARD -->
+  <div class="card">
+    <div class="card-title">Configuration</div>
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="field">
+        <label>Massive API Key</label>
+        <input type="password" id="apiKey" placeholder="Enter your Massive API key...">
+        <div class="hint">Never stored — only used for live API calls</div>
+      </div>
+      <div class="field">
+        <label>Exchange</label>
+        <select id="exchangeFilter">
+          <option value="">All Major Exchanges (NYSE + NASDAQ)</option>
+          <option value="XNYS">NYSE only</option>
+          <option value="XNAS">NASDAQ only</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-bottom:10px">Lichello Filter Criteria</div>
+    <div class="grid-3" style="margin-bottom:16px">
+      <div class="field">
+        <label>Market Cap Min ($M)</label>
+        <input type="number" id="mcMin" value="100" step="10">
+      </div>
+      <div class="field">
+        <label>Market Cap Max ($M)</label>
+        <input type="number" id="mcMax" value="300" step="10">
+      </div>
+      <div class="field">
+        <label>Min Avg Daily Volume</label>
+        <input type="number" id="volMin" value="200000" step="10000">
+      </div>
+      <div class="field">
+        <label>Min Intraday Volatility %</label>
+        <input type="number" id="rangeMin" value="1.5" step="0.5">
+        <div class="hint">(H−L)/L × 100 — AIM needs swings</div>
+      </div>
+      <div class="field">
+        <label>Min Revenue Growth YoY %</label>
+        <input type="number" id="revGrowthMin" value="0" step="5">
+      </div>
+      <div class="field">
+        <label>Max Debt / Equity Ratio</label>
+        <input type="number" id="debtMax" value="2.0" step="0.1">
+        <div class="hint">Lichello: low debt = stock recovers from dips</div>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-bottom:10px">Perfect Stock Threshold</div>
+    <div class="grid-4" style="margin-bottom:16px">
+      <div class="field">
+        <label>Min AIM Score to Alert</label>
+        <input type="number" id="perfectThreshold" value="80" min="50" max="100" step="5">
+        <div class="hint">Triggers alert + browser notification</div>
+      </div>
+      <div class="field">
+        <label>Not At 52-Wk High</label>
+        <select id="avoid52High">
+          <option value="1">Yes — avoid stocks at highs</option>
+          <option value="0">No — show all</option>
+        </select>
+        <div class="hint">Lichello: buy a strong company on its knees</div>
+      </div>
+      <div class="field">
+        <label>Min Profit Margin %</label>
+        <input type="number" id="marginMin" value="0" step="1">
+      </div>
+      <div class="field">
+        <label>Exclude Reverse Splits</label>
+        <select id="excludeRevSplit">
+          <option value="1">Yes — exclude (2yr lookback)</option>
+          <option value="0">No — allow</option>
+        </select>
+        <div class="hint">Reverse split = company in distress, AIM math breaks</div>
+      </div>
+      <div class="field">
+        <label>Exclude Share Dilution</label>
+        <select id="excludeDilution">
+          <option value="1">Yes — exclude &gt;15% share growth YoY</option>
+          <option value="0">No — allow</option>
+        </select>
+        <div class="hint">Dilution voted yes destroys per-share AIM math</div>
+      </div>
+      <div class="field">
+        <label>Sound Alert</label>
+        <select id="soundAlert">
+          <option value="1">On — beep when perfect stock found</option>
+          <option value="0">Off</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="runBtn" onclick="runScreener()">▶ Scan Now</button>
+      <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopScreener()" style="display:none">■ Stop</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearResults()">Clear</button>
+      <button class="btn btn-secondary btn-sm" onclick="requestNotifyPermission()">🔔 Enable Notifications</button>
+      <div class="legend">
+        <span><span class="dot-sm" style="background:var(--green)"></span> A ≥ 75</span>
+        <span><span class="dot-sm" style="background:#84cc16"></span> B 55–74</span>
+        <span><span class="dot-sm" style="background:var(--yellow)"></span> C 35–54</span>
+        <span><span class="dot-sm" style="background:var(--red)"></span> D &lt; 35</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERFECT STOCK ALERT -->
+  <div class="perfect-alert" id="perfectAlert">
+    <div class="alert-title">⚡ Lichello Perfect Stock Candidates</div>
+    <div class="perfect-cards" id="perfectCards"></div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="alert alert-error" id="errorAlert"></div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">Initializing...</div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-stats" id="progressStats"></div>
+  </div>
+
+  <!-- SCAN LOG -->
+  <div class="scan-log" id="scanLog">
+    <div class="scan-log-title">Scan History</div>
+    <div id="scanLogEntries"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" style="display:none">
+    <div class="results-header">
+      <div class="results-count" id="resultsCount"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="lastScanTime" style="font-size:12px;color:var(--muted)"></span>
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th onclick="sortBy('ticker')" data-col="ticker">Ticker <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('aimScore')" data-col="aimScore">AIM Score <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('marketCap')" data-col="marketCap">Mkt Cap <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('volume')" data-col="volume">Volume <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('volatility')" data-col="volatility">Volatility % <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('price')" data-col="price">Price <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('changePerc')" data-col="changePerc">Day % <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('revenueGrowth')" data-col="revenueGrowth">Rev Growth <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('debtEquity')" data-col="debtEquity">D/E <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('pe')" data-col="pe">P/E <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('profitMargin')" data-col="profitMargin">Margin % <span class="sort-icon">↕</span></th>
+            <th>Load</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const BASE = 'https://api.massive.com';
+const TRADING_START_H = 7;   // 7am EST
+const TRADING_END_H   = 20;  // 8pm EST
+
+// ============================================================
+// STATE
+// ============================================================
+let aborted        = false;
+let allResults     = [];
+let prevTickers    = new Set();
+let sortCol        = 'aimScore';
+let sortDir        = -1;
+let autoScanTimer  = null;
+let countdownTimer = null;
+let scanCount      = 0;
+let nextScanAt     = null;
+
+// ============================================================
+// TRADING HOURS CLOCK
+// ============================================================
+function estNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+}
+
+function isInTradingHours() {
+  const now = estNow();
+  const h = now.getHours() + now.getMinutes() / 60;
+  return h >= TRADING_START_H && h < TRADING_END_H;
+}
+
+function updateClock() {
+  const now = estNow();
+  document.getElementById('estClock').textContent =
+    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' EST';
+
+  const inHours = isInTradingHours();
+  const scanning = document.getElementById('runBtn').disabled;
+  const dot = document.getElementById('tradingDot');
+  const status = document.getElementById('tradingStatus');
+
+  dot.className = 'trading-dot ' + (scanning ? 'dot-scanning' : inHours ? 'dot-live' : 'dot-closed');
+  status.textContent = scanning ? 'Scanning...' : inHours ? 'Market Window Open (7am–8pm EST)' : 'Outside Trading Window';
+  status.style.color = scanning ? 'var(--yellow)' : inHours ? 'var(--green)' : 'var(--muted)';
+
+  if (nextScanAt && !scanning) {
+    const secsLeft = Math.max(0, Math.round((nextScanAt - Date.now()) / 1000));
+    const m = Math.floor(secsLeft / 60);
+    const s = secsLeft % 60;
+    document.getElementById('countdownDisplay').textContent =
+      `Next scan in ${m}:${String(s).padStart(2,'0')}`;
+    document.getElementById('countdownDisplay').style.display = 'block';
+  } else {
+    document.getElementById('countdownDisplay').style.display = 'none';
+  }
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// AUTO-SCAN
+// ============================================================
+function toggleAutoScan() {
+  const on = document.getElementById('autoScanToggle').checked;
+  document.getElementById('autoScanLabel').textContent = on ? 'Auto-scan ON' : 'Auto-scan OFF';
+
+  if (on) {
+    if (!document.getElementById('apiKey').value.trim()) {
+      alert('Enter your Massive API key first.');
+      document.getElementById('autoScanToggle').checked = false;
+      document.getElementById('autoScanLabel').textContent = 'Auto-scan OFF';
+      return;
+    }
+    scheduleNextScan();
+    if (isInTradingHours()) runScreener();
+  } else {
+    clearAutoScan();
+  }
+}
+
+function scheduleNextScan() {
+  clearAutoScan();
+  const intervalMs = parseInt(document.getElementById('scanInterval').value) * 60 * 1000;
+  nextScanAt = Date.now() + intervalMs;
+  autoScanTimer = setTimeout(() => {
+    if (isInTradingHours()) {
+      runScreener().then(() => {
+        if (document.getElementById('autoScanToggle').checked) scheduleNextScan();
+      });
+    } else {
+      addLog('Outside trading hours (7am–8pm EST) — scan skipped.', 'warn');
+      if (document.getElementById('autoScanToggle').checked) scheduleNextScan();
+    }
+  }, intervalMs);
+}
+
+function clearAutoScan() {
+  if (autoScanTimer) { clearTimeout(autoScanTimer); autoScanTimer = null; }
+  nextScanAt = null;
+}
+
+// ============================================================
+// BROWSER NOTIFICATIONS
+// ============================================================
+async function requestNotifyPermission() {
+  if (!('Notification' in window)) { alert('Browser notifications not supported.'); return; }
+  const result = await Notification.requestPermission();
+  if (result === 'granted') addLog('Browser notifications enabled.', 'info');
+  else addLog('Notification permission denied.', 'warn');
+}
+
+function sendNotification(title, body) {
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, icon: '' });
+  }
+}
+
+function beep() {
+  if (document.getElementById('soundAlert').value !== '1') return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.35);
+    });
+  } catch(e) {}
+}
+
+// ============================================================
+// SCAN LOG
+// ============================================================
+function addLog(msg, type = 'info') {
+  const log = document.getElementById('scanLog');
+  const entries = document.getElementById('scanLogEntries');
+  log.style.display = 'block';
+
+  const now = estNow().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type === 'perfect' ? 'log-perfect' : type === 'warn' ? 'log-warn' : ''}">${msg}</span>`;
+  entries.insertBefore(div, entries.firstChild);
+
+  // Keep last 50 entries
+  while (entries.children.length > 50) entries.removeChild(entries.lastChild);
+}
+
+// ============================================================
+// PROGRESS HELPERS
+// ============================================================
+function showProgress(label, pct, stats = '') {
+  const wrap = document.getElementById('progressWrap');
+  wrap.style.display = 'block';
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStats').innerHTML = stats;
+}
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+function showError(msg) {
+  const el = document.getElementById('errorAlert');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideError() { document.getElementById('errorAlert').style.display = 'none'; }
+
+// ============================================================
+// AIM SCORE — Lichello's criteria weighted
+// ============================================================
+function calcAIMScore(stock) {
+  let score = 0;
+
+  // Volatility (40 pts) — AIM's primary engine
+  const v = stock.volatility || 0;
+  score += v >= 5 ? 40 : v >= 3 ? 32 : v >= 2 ? 22 : v >= 1 ? 12 : 0;
+
+  // Revenue Growth (25 pts) — fast-growing companies recover quicker
+  const rg = stock.revenueGrowth;
+  if (rg != null) score += rg >= 20 ? 25 : rg >= 10 ? 20 : rg >= 0 ? 12 : 0;
+  else score += 8;
+
+  // Debt / Equity (20 pts) — durable = survives dips to let AIM buy cheap
+  const de = stock.debtEquity;
+  if (de != null) score += de <= 0.3 ? 20 : de <= 0.8 ? 15 : de <= 1.5 ? 8 : de <= 2.0 ? 3 : 0;
+  else score += 8;
+
+  // Profitability (10 pts) — real earnings, not speculation
+  const pe = stock.pe;
+  if (pe != null && pe > 0 && pe < 80) score += 10;
+  else if (pe != null && pe > 0)       score += 5;
+
+  // Liquid enough for AIM to execute trades (5 pts)
+  score += stock.volume >= 500000 ? 5 : stock.volume >= 200000 ? 3 : 0;
+
+  return Math.min(score, 100);
+}
+
+function scoreGrade(s) {
+  return s >= 75 ? 'A' : s >= 55 ? 'B' : s >= 35 ? 'C' : 'D';
+}
+
+// ============================================================
+// API HELPERS
+// ============================================================
+function apiHeaders() {
+  return { 'Authorization': `Bearer ${document.getElementById('apiKey').value.trim()}` };
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function fetchJSON(url) {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  // append key as query param fallback (some CORS configs need this)
+  const sep = url.includes('?') ? '&' : '?';
+  const fullUrl = url + sep + 'apiKey=' + encodeURIComponent(apiKey);
+  let res;
+  try {
+    res = await fetch(fullUrl, { headers: apiHeaders() });
+  } catch (e) {
+    throw new Error('Network / CORS error — Massive API blocked the browser request. ' +
+      'Check that your API plan allows browser (CORS) access, or contact Massive support. ' +
+      '(' + e.message + ')');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${url}`);
+  return res.json();
+}
+
+async function batchFetch(items, fn, size = 20, delay = 120, onProgress) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) {
+    if (aborted) break;
+    const batch = items.slice(i, i + size);
+    const results = await Promise.all(batch.map(item => fn(item).catch(() => null)));
+    out.push(...results);
+    if (onProgress) onProgress(Math.min(i + size, items.length), items.length);
+    if (i + size < items.length) await sleep(delay);
+  }
+  return out;
+}
+
+// ============================================================
+// MAIN SCREENER
+// ============================================================
+async function runScreener() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showError('Please enter your Massive API key.'); return; }
+
+  hideError();
+  aborted = false;
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = 'inline-flex';
+
+  const mcMin          = parseFloat(document.getElementById('mcMin').value) * 1e6;
+  const mcMax          = parseFloat(document.getElementById('mcMax').value) * 1e6;
+  const volMin         = parseInt(document.getElementById('volMin').value);
+  const rangeMin       = parseFloat(document.getElementById('rangeMin').value);
+  const revMin         = parseFloat(document.getElementById('revGrowthMin').value);
+  const debtMax        = parseFloat(document.getElementById('debtMax').value);
+  const marginMin      = parseFloat(document.getElementById('marginMin').value);
+  const threshold      = parseInt(document.getElementById('perfectThreshold').value);
+  const avoid52High    = document.getElementById('avoid52High').value === '1';
+  const excludeRevSplit  = document.getElementById('excludeRevSplit').value === '1';
+  const excludeDilution  = document.getElementById('excludeDilution').value === '1';
+
+  const scanStart = Date.now();
+  scanCount++;
+  document.getElementById('scanCountDisplay').innerHTML = `Scan <b>#${scanCount}</b>`;
+  addLog(`Scan #${scanCount} started — market cap $${mcMin/1e6}M–$${mcMax/1e6}M, vol ≥ ${volMin.toLocaleString()}`);
+
+  try {
+    // ── STEP 1: Real-time market snapshot ───────────────────
+    showProgress('Step 1 / 4 — Real-time market snapshot...', 5, 'Pulling live US tickers from Massive real-time feed...');
+
+    const snapData = await fetchJSON(`${BASE}/v2/snapshot/locale/us/markets/stocks/tickers?include_otc=false`);
+    if (!snapData.tickers?.length) throw new Error('No snapshot data. Market may be closed or API key invalid.');
+
+    const snapMap = {};
+    snapData.tickers.forEach(t => { snapMap[t.ticker] = t; });
+
+    const volFiltered = snapData.tickers.filter(t => (t.day?.v || t.min?.av || 0) >= volMin);
+
+    showProgress('Step 1 / 4 — Snapshot received', 10,
+      `<span>Total tickers: <b>${snapData.tickers.length.toLocaleString()}</b></span>
+       <span>Volume ≥ ${volMin.toLocaleString()}: <b>${volFiltered.length.toLocaleString()}</b></span>`);
+
+    if (aborted) return finish();
+    await sleep(200);
+
+    // ── STEP 2: Reference details → market cap filter ───────
+    const capFiltered = [];
+
+    await batchFetch(
+      volFiltered,
+      async t => {
+        const d = await fetchJSON(`${BASE}/v3/reference/tickers/${t.ticker}`);
+        return { ticker: t.ticker, detail: d.results };
+      },
+      20, 120,
+      (done, total) => {
+        const pct = 12 + (done / total) * 33;
+        showProgress('Step 2 / 4 — Filtering by market cap...', pct,
+          `<span>Checked: <b>${done.toLocaleString()} / ${total.toLocaleString()}</b></span>
+           <span>Passed: <b>${capFiltered.length}</b></span>`);
+      }
+    ).then(details => {
+      details.forEach(d => {
+        if (!d?.detail) return;
+        const mc = d.detail.market_cap;
+        if (!mc || mc < mcMin || mc > mcMax) return;
+
+        const snap  = snapMap[d.ticker];
+        const dayH  = snap?.day?.h || snap?.prevDay?.h || 0;
+        const dayL  = snap?.day?.l || snap?.prevDay?.l || 0;
+        const dayC  = snap?.day?.c || snap?.lastTrade?.p || 0;
+        const dayV  = snap?.day?.v || snap?.min?.av || 0;
+        const vol52h = d.detail.week_52_high || null;
+        const volatility = dayL > 0 ? ((dayH - dayL) / dayL) * 100 : 0;
+
+        if (avoid52High && vol52h && dayC >= vol52h * 0.97) return;
+        if (volatility < rangeMin) return;
+
+        capFiltered.push({
+          ticker:        d.ticker,
+          name:          d.detail.name || d.ticker,
+          marketCap:     mc,
+          price:         dayC,
+          volume:        dayV,
+          volatility:    parseFloat(volatility.toFixed(2)),
+          changePerc:    snap?.todaysChangePerc || 0,
+          week52High:    vol52h,
+          revenueGrowth: null,
+          debtEquity:    null,
+          pe:            null,
+          profitMargin:  null,
+          sharesGrowth:  null,
+          hadRevSplit:   false,
+          aimScore:      0,
+          isNew:         !prevTickers.has(d.ticker),
+        });
+      });
+    });
+
+    if (aborted) return finish();
+    if (!capFiltered.length) {
+      hideProgress();
+      addLog('No stocks passed market cap + volatility filter.', 'warn');
+      return finish();
+    }
+
+    // ── STEP 3: Real-time price + fundamentals ──────────────
+    showProgress('Step 3 / 4 — Real-time prices + fundamentals...', 47,
+      `<span>Cap + volatility passed: <b>${capFiltered.length}</b></span>`);
+
+    await batchFetch(
+      capFiltered,
+      async stock => {
+        // Real-time last trade price (supersedes snapshot close)
+        const [rtData, ratioData] = await Promise.all([
+          fetchJSON(`${BASE}/v2/last/trade/${stock.ticker}`).catch(() => null),
+          fetchJSON(`${BASE}/stocks/financials/v1/ratios?ticker=${stock.ticker}&limit=1&sort=period_of_report.desc`).catch(() => null),
+        ]);
+        const rtPrice = rtData?.results?.p || null;
+        const ratios  = ratioData ? (Array.isArray(ratioData.results) ? ratioData.results[0] : ratioData.results) : null;
+        return { ticker: stock.ticker, rtPrice, ratios };
+      },
+      10, 150,
+      (done, total) => {
+        showProgress('Step 3 / 4 — Real-time prices + fundamentals...', 47 + (done / total) * 28,
+          `<span>Loaded: <b>${done} / ${total}</b></span>`);
+      }
+    ).then(results => {
+      results.forEach(r => {
+        if (!r) return;
+        const s = capFiltered.find(x => x.ticker === r.ticker);
+        if (!s) return;
+        if (r.rtPrice) s.price = r.rtPrice;  // upgrade to real-time price
+        const rt = r.ratios;
+        if (rt) {
+          s.revenueGrowth = rt.revenue_growth      != null ? parseFloat((rt.revenue_growth * 100).toFixed(1))                : null;
+          s.debtEquity    = rt.debt_to_equity      != null ? parseFloat(rt.debt_to_equity.toFixed(2))                        : null;
+          s.pe            = (rt.price_to_earnings ?? rt.pe_ratio) != null
+                              ? parseFloat((rt.price_to_earnings ?? rt.pe_ratio).toFixed(1))                                  : null;
+          s.profitMargin  = (rt.net_profit_margin ?? rt.profit_margin) != null
+                              ? parseFloat(((rt.net_profit_margin ?? rt.profit_margin) * 100).toFixed(1))                     : null;
+          // shares outstanding growth — detect dilution
+          const sharesNow  = rt.weighted_average_shares ?? rt.shares_outstanding ?? null;
+          const sharesPrev = rt.weighted_average_shares_prev ?? rt.shares_outstanding_prev ?? null;
+          if (sharesNow && sharesPrev && sharesPrev > 0) {
+            s.sharesGrowth = parseFloat(((sharesNow - sharesPrev) / sharesPrev * 100).toFixed(1));
+          }
+        }
+        const rgOk = s.revenueGrowth == null || s.revenueGrowth >= revMin;
+        const deOk = s.debtEquity    == null || s.debtEquity    <= debtMax;
+        const mgOk = s.profitMargin  == null || s.profitMargin  >= marginMin;
+        const dilOk = !excludeDilution || s.sharesGrowth == null || s.sharesGrowth <= 15;
+        s._pass = rgOk && deOk && mgOk && dilOk;
+        s.aimScore = calcAIMScore(s);
+      });
+    });
+
+    if (aborted) return finish();
+
+    // ── STEP 4: Corporate actions — reverse split check ─────
+    const fundPassed = capFiltered.filter(s => s._pass !== false);
+
+    if (excludeRevSplit && fundPassed.length) {
+      showProgress('Step 4 / 4 — Checking for reverse splits...', 77,
+        `<span>Screening <b>${fundPassed.length}</b> candidates for reverse splits (2yr lookback)</span>`);
+
+      const twoYrsAgo = new Date();
+      twoYrsAgo.setFullYear(twoYrsAgo.getFullYear() - 2);
+      const since = twoYrsAgo.toISOString().slice(0, 10);
+
+      await batchFetch(
+        fundPassed,
+        async stock => {
+          const d = await fetchJSON(
+            `${BASE}/v3/reference/splits?ticker=${stock.ticker}&execution_date.gte=${since}&order=desc&limit=5`
+          ).catch(() => null);
+          return { ticker: stock.ticker, splits: d?.results || [] };
+        },
+        20, 100,
+        (done, total) => {
+          showProgress('Step 4 / 4 — Reverse split check...', 77 + (done / total) * 18,
+            `<span>Checked: <b>${done} / ${total}</b></span>`);
+        }
+      ).then(splitResults => {
+        splitResults.forEach(r => {
+          if (!r) return;
+          const s = capFiltered.find(x => x.ticker === r.ticker);
+          if (!s) return;
+          // reverse split: split_from > split_to (e.g. 10-for-1 → split_from=10, split_to=1)
+          const hadReverse = r.splits.some(sp => (sp.split_from || 1) > (sp.split_to || 1));
+          if (hadReverse) {
+            s.hadRevSplit = true;
+            s._pass = false;
+          }
+        });
+      });
+    } else {
+      showProgress('Step 4 / 4 — Skipping reverse split check', 95, '');
+      await sleep(100);
+    }
+
+    // Final filtered + scored list
+    const passed = capFiltered.filter(s => s._pass !== false);
+    const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
+
+    // Update prev tickers set
+    prevTickers = new Set(passed.map(s => s.ticker));
+    allResults  = passed.sort((a, b) => b.aimScore - a.aimScore);
+
+    // Perfect stock candidates
+    const perfect = allResults.filter(s => s.aimScore >= threshold);
+
+    hideProgress();
+    renderResults();
+    renderPerfectAlert(perfect, threshold);
+
+    document.getElementById('lastScanTime').textContent = `Last scan: ${estNow().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})} EST`;
+
+    const revSplitDropped = excludeRevSplit ? capFiltered.filter(s => s.hadRevSplit).length : 0;
+    const dilutionDropped = excludeDilution ? capFiltered.filter(s => s._pass === false && !s.hadRevSplit && s.sharesGrowth > 15).length : 0;
+    addLog(`Scan #${scanCount} complete — ${passed.length} candidates in ${elapsed}s` +
+           (revSplitDropped ? ` | ${revSplitDropped} dropped (reverse split)` : '') +
+           (dilutionDropped ? ` | ${dilutionDropped} dropped (dilution)` : '') +
+           '. ' + (perfect.length ? `${perfect.length} perfect stock(s) found!` : 'No perfect stocks this scan.'),
+           perfect.length ? 'perfect' : 'info');
+
+    if (perfect.length) {
+      beep();
+      sendNotification('⚡ AIM Perfect Stock Found!',
+        perfect.slice(0,3).map(s => `${s.ticker} (${s.aimScore}/100)`).join(', '));
+    }
+
+  } catch(err) {
+    hideProgress();
+    showError('Screener error: ' + err.message);
+    addLog('Error: ' + err.message, 'warn');
+    console.error(err);
+  }
+
+  finish();
+}
+
+function finish() {
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  updateClock();
+}
+
+function stopScreener() { aborted = true; hideProgress(); finish(); }
+
+function clearResults() {
+  allResults = []; prevTickers = new Set();
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('perfectAlert').style.display = 'none';
+  hideError(); hideProgress();
+}
+
+// ============================================================
+// PERFECT STOCK ALERT BANNER
+// ============================================================
+function renderPerfectAlert(perfect, threshold) {
+  const el = document.getElementById('perfectAlert');
+  const cards = document.getElementById('perfectCards');
+  if (!perfect.length) { el.style.display = 'none'; return; }
+
+  cards.innerHTML = perfect.slice(0, 8).map(s => `
+    <div class="perfect-card" onclick="loadIntoAIM('${s.ticker}', ${s.price})">
+      <div class="pc-ticker">${s.ticker}</div>
+      <div class="pc-name">${s.name}</div>
+      <div class="pc-score">
+        Score: <b style="color:var(--green)">${s.aimScore}/100</b> &nbsp;
+        Vol: ${s.volatility.toFixed(1)}% &nbsp;
+        $${s.price.toFixed(2)}
+      </div>
+    </div>`).join('');
+  el.style.display = 'block';
+}
+
+// ============================================================
+// RESULTS TABLE
+// ============================================================
+function renderResults() {
+  const section = document.getElementById('resultsSection');
+  const body    = document.getElementById('resultsBody');
+  const threshold = parseInt(document.getElementById('perfectThreshold').value);
+
+  if (!allResults.length) {
+    body.innerHTML = '<tr><td colspan="12"><div style="text-align:center;padding:40px;color:var(--muted)">No stocks matched all criteria this scan.</div></td></tr>';
+    document.getElementById('resultsCount').innerHTML = '<b>0</b> stocks found';
+    section.style.display = 'block';
+    return;
+  }
+
+  const sorted = [...allResults].sort((a, b) => {
+    const va = a[sortCol] ?? -Infinity;
+    const vb = b[sortCol] ?? -Infinity;
+    return sortDir * (typeof va === 'string' ? va.localeCompare(vb) : vb - va);
+  });
+
+  const perfectCount = sorted.filter(s => s.aimScore >= threshold).length;
+  document.getElementById('resultsCount').innerHTML =
+    `<b>${sorted.length}</b> candidates &nbsp;·&nbsp; <span style="color:var(--green)"><b>${perfectCount}</b> perfect</span> (≥${threshold})`;
+
+  body.innerHTML = sorted.map(s => {
+    const grade = scoreGrade(s.aimScore);
+    const grClass = { A:'score-A', B:'score-B', C:'score-C', D:'score-D' }[grade];
+    const scoreBar = `<div class="score-wrap">
+      <span>${s.aimScore}</span>
+      <div class="score-bar"><div class="score-fill ${grClass}" style="width:${s.aimScore}%"></div></div>
+      <span class="tag tag-${grade==='A'?'green':grade==='D'?'red':'muted'}">${grade}</span>
+    </div>`;
+
+    const rg = s.revenueGrowth != null
+      ? `<span class="${s.revenueGrowth >= 0 ? 'up' : 'down'}">${s.revenueGrowth >= 0?'+':''}${s.revenueGrowth}%</span>`
+      : '<span style="color:var(--muted)">—</span>';
+    const de  = s.debtEquity   != null ? s.debtEquity.toFixed(2)  : '—';
+    const pe  = s.pe           != null && s.pe > 0 ? s.pe.toFixed(1) : '—';
+    const mg  = s.profitMargin != null ? `${s.profitMargin.toFixed(1)}%` : '—';
+    const chg = `<span class="${s.changePerc>=0?'up':'down'}">${s.changePerc>=0?'+':''}${s.changePerc.toFixed(2)}%</span>`;
+    const isPerfect = s.aimScore >= threshold;
+    const isNew = s.isNew;
+
+    return `<tr class="${isPerfect?'perfect-row':''} ${isNew?'new-row':''}">
+      <td>
+        <a class="ticker-link" href="https://finance.yahoo.com/quote/${s.ticker}" target="_blank">${s.ticker}</a>
+        ${isNew ? '<span class="tag tag-new" style="margin-left:4px">NEW</span>' : ''}
+        <span class="company-name">${s.name}</span>
+      </td>
+      <td>${scoreBar}</td>
+      <td>$${(s.marketCap/1e6).toFixed(0)}M</td>
+      <td>${(s.volume/1000).toFixed(0)}K</td>
+      <td class="${s.volatility>=3?'up':''}">${s.volatility.toFixed(2)}%</td>
+      <td>$${s.price.toFixed(2)}</td>
+      <td>${chg}</td>
+      <td>${rg}</td>
+      <td>${de}</td>
+      <td>${pe}</td>
+      <td>${mg}</td>
+      <td><button class="load-btn" onclick="loadIntoAIM('${s.ticker}',${s.price})">Load →</button></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === sortCol);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = th.dataset.col === sortCol ? (sortDir===-1?'↓':'↑') : '↕';
+  });
+
+  section.style.display = 'block';
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  renderResults();
+}
+
+// ============================================================
+// LOAD INTO AIM TRACKER
+// ============================================================
+function loadIntoAIM(ticker, price) {
+  localStorage.setItem('aim_load', JSON.stringify({ ticker, price }));
+  window.open('index.html', '_blank');
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportCSV() {
+  if (!allResults.length) return;
+  const headers = ['Ticker','Name','AIM Score','Grade','Market Cap','Volume','Volatility %','Price','Day %','Rev Growth %','D/E','P/E','Margin %'];
+  const rows = allResults.map(s => [
+    s.ticker, `"${s.name}"`, s.aimScore, scoreGrade(s.aimScore),
+    (s.marketCap/1e6).toFixed(0), s.volume, s.volatility.toFixed(2),
+    s.price.toFixed(2), s.changePerc.toFixed(2),
+    s.revenueGrowth??'', s.debtEquity??'', s.pe??'', s.profitMargin??''
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `aim-screener-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ============================================================
+// AUTO-START: if already in trading hours on page load, prompt
+// ============================================================
+window.addEventListener('load', () => {
+  if (isInTradingHours()) {
+    addLog('Trading window is open (7am–8pm EST). Enter your API key and enable Auto-scan or click Scan Now.');
+  } else {
+    const now = estNow();
+    const h = now.getHours();
+    const msg = h < TRADING_START_H
+      ? `Trading window opens at 7:00 AM EST.`
+      : `Trading window closed at 8:00 PM EST. Resumes tomorrow at 7:00 AM.`;
+    addLog(msg, 'warn');
+  }
+});
+</script>
+</body>
+</html>

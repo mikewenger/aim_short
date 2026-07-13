@@ -1,0 +1,12 @@
+{
+  "name": "aim-short-tracker",
+  "version": "1.0.0",
+  "description": "Lichello AIM Automatic Investment Management Tracker — Short strategy variant",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
