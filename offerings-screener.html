@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AIM Dilution Risk Screener</title>
+<title>AIM Offerings Scanner</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -17,7 +17,7 @@
 
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   header h1 { font-size: 20px; font-weight: 700; }
-  header h1 span { color: var(--red); }
+  header h1 span { color: var(--yellow); }
   header .subtitle { color: var(--muted); font-size: 12px; }
   .badge { background: var(--blue-dim); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: auto; }
   .back-link { color: var(--muted); font-size: 12px; text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 5px; }
@@ -39,13 +39,17 @@
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
-  .btn-primary { background: var(--red); color: white; }
-  .btn-primary:hover:not(:disabled) { background: #dc2626; }
+  .btn-primary { background: var(--yellow); color: #1a1200; }
+  .btn-primary:hover:not(:disabled) { background: #d97706; }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--blue); }
   .btn-danger { background: var(--red); color: white; }
   .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  .checkbox-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .checkbox-row label { display: flex; align-items: center; gap: 6px; color: var(--text); cursor: pointer; }
+  .checkbox-row input[type="checkbox"] { width: auto; accent-color: var(--yellow); }
 
   .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: var(--muted); align-items: center; }
   .legend span { display: flex; align-items: center; gap: 5px; }
@@ -55,7 +59,7 @@
   .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; display: none; }
   .progress-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
   .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 8px; }
-  .progress-bar-fill { background: var(--red); height: 100%; border-radius: 4px; transition: width 0.3s; width: 0%; }
+  .progress-bar-fill { background: var(--yellow); height: 100%; border-radius: 4px; transition: width 0.3s; width: 0%; }
   .progress-stats { display: flex; gap: 20px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .progress-stats b { color: var(--text); }
 
@@ -67,12 +71,11 @@
   .log-time { font-family: monospace; white-space: nowrap; color: var(--muted); }
   .log-msg { color: var(--text); }
   .log-warn { color: var(--yellow); }
-  .log-urgent { color: var(--red); font-weight: 600; }
 
   /* ALERT */
   .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
   .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
-  .alert-legal { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow); display: block; line-height: 1.6; }
+  .alert-info { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: var(--blue); display: block; line-height: 1.6; }
 
   /* RESULTS */
   .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
@@ -80,7 +83,7 @@
   .results-count b { color: var(--text); }
 
   .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 980px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 940px; }
   th { background: var(--surface2); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 8px 10px; text-align: right; white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none; z-index: 2; }
   th:hover { color: var(--text); }
   th:first-child, th:nth-child(2) { text-align: left; }
@@ -89,19 +92,11 @@
   td { padding: 8px 10px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
   td:first-child, td:nth-child(2) { text-align: left; }
   tr:hover td { background: var(--surface2); }
-  tr.urgent-row td { background: rgba(239,68,68,0.05); }
-  tr.urgent-row:hover td { background: rgba(239,68,68,0.1); }
-
-  .score-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
-  .score-bar { width: 50px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
-  .score-fill { height: 100%; border-radius: 3px; }
-  .score-hi { background: var(--red); }
-  .score-mid { background: var(--yellow); }
-  .score-lo { background: var(--green); }
+  tr.fresh-row td { background: rgba(245,158,11,0.06); }
+  tr.fresh-row:hover td { background: rgba(245,158,11,0.12); }
 
   .tag { display: inline-block; padding: 1px 7px; border-radius: 3px; font-size: 10px; font-weight: 700; }
-  .tag-green { background: var(--green-dim); color: var(--green); }
-  .tag-red { background: var(--red-dim); color: var(--red); }
+  .tag-yellow { background: rgba(245,158,11,0.18); color: var(--yellow); }
   .tag-muted { background: var(--surface2); color: var(--muted); }
 
   .up { color: var(--green); }
@@ -109,10 +104,10 @@
 
   .ticker-link { font-weight: 700; color: var(--blue); text-decoration: none; font-size: 13px; }
   .ticker-link:hover { text-decoration: underline; }
-  .company-name { font-size: 11px; color: var(--muted); display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .company-name { font-size: 11px; color: var(--muted); display: block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .load-btn { background: var(--red-dim); color: var(--red); border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-  .load-btn:hover { background: rgba(239,68,68,0.2); }
+  .load-btn { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .load-btn:hover { background: rgba(245,158,11,0.25); }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -123,19 +118,19 @@
 
 <header>
   <div>
-    <h1>AIM <span>Dilution Screener</span></h1>
-    <div class="subtitle">Public leading indicators of a coming offering — ATM facilities, cash runway, shelf status, offering history</div>
+    <h1>AIM <span>Offerings Scanner</span></h1>
+    <div class="subtitle">Already-filed public offerings — IPOs and follow-on/secondary raises — matching your price &amp; float criteria</div>
   </div>
   <a href="index.html" class="back-link">← AIM Short</a>
   <a href="screener.html" class="back-link">Long Screener</a>
-  <a href="offerings-screener.html" class="back-link">Offerings Scanner</a>
+  <a href="dilution-screener.html" class="back-link">Dilution Risk (forward-looking)</a>
   <span class="badge">v1.0</span>
 </header>
 
 <div class="page">
 
-  <div class="alert alert-legal">
-    <b>What this is and isn't:</b> every signal below is public — a filed 8-K, a filed 10-Q, a filed S-3. This ranks who's <i>structurally likely</i> to raise capital soon (thin cash, standing sale capacity, a habit of doing so), the same way a credit analyst ranks default risk from public financials. It is not, and cannot be, advance knowledge of a specific deal — trading on actual non-public knowledge of a pending offering is insider trading.
+  <div class="alert alert-info">
+    <b>What this finds:</b> companies that have already priced a public offering — a 424B3/424B4/424B5 prospectus filed with the SEC, which covers both IPOs and follow-on/secondary raises by already-public companies. This is the reactive counterpart to the <a href="dilution-screener.html" style="color:var(--blue)">Dilution Risk screener</a>, which looks for offerings <i>before</i> they're announced.
   </div>
 
   <!-- CONFIG CARD -->
@@ -155,7 +150,7 @@
     </div>
 
     <div class="card-title" style="margin-bottom:10px">Screen Criteria</div>
-    <div class="grid-4" style="margin-bottom:16px">
+    <div class="grid-4" style="margin-bottom:12px">
       <div class="field">
         <label>Max Price ($)</label>
         <input type="number" id="priceMax" value="5" step="0.5">
@@ -165,25 +160,27 @@
         <input type="number" id="sharesMax" value="20000000" step="1000000">
       </div>
       <div class="field">
-        <label>ATM Filing Lookback (months)</label>
-        <input type="number" id="atmMonths" value="4" min="1" max="24">
-        <div class="hint">How far back to search for standing ATM sales agreements</div>
+        <label>Filing Lookback (months)</label>
+        <input type="number" id="lookbackMonths" value="1" min="1" max="24">
+        <div class="hint">How far back to search for 424B filings</div>
       </div>
       <div class="field">
-        <label>Offering History Lookback (months)</label>
-        <input type="number" id="dilutionMonths" value="18" min="1" max="36">
-        <div class="hint">Window for counting past 424B offerings per company</div>
+        <label>Forms to include</label>
+        <div class="checkbox-row" style="margin-top:8px">
+          <label><input type="checkbox" id="form424B4" checked> 424B4</label>
+          <label><input type="checkbox" id="form424B5" checked> 424B5</label>
+          <label><input type="checkbox" id="form424B3" checked> 424B3</label>
+        </div>
+        <div class="hint">B4 = IPO final prospectus, B5 = follow-on/secondary, B3 = other resale/shelf takedowns</div>
       </div>
     </div>
 
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-primary" id="runBtn" onclick="runScreener()">▶ Run Screen</button>
+      <button class="btn btn-primary" id="runBtn" onclick="runScreener()">▶ Run Scan</button>
       <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopScreener()" style="display:none">■ Stop</button>
       <button class="btn btn-secondary btn-sm" onclick="clearResults()">Clear</button>
       <div class="legend">
-        <span><span class="dot-sm" style="background:var(--red)"></span> Score ≥ 10 — highest apparent urgency</span>
-        <span><span class="dot-sm" style="background:var(--yellow)"></span> Score 6–9 — moderate</span>
-        <span><span class="dot-sm" style="background:var(--green)"></span> Score &lt; 6 — lower</span>
+        <span><span class="dot-sm" style="background:var(--yellow)"></span> Filed within the last 7 days</span>
       </div>
     </div>
   </div>
@@ -219,12 +216,11 @@
           <tr>
             <th onclick="sortBy('ticker')" data-col="ticker">Ticker <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('company')" data-col="company">Company <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('score')" data-col="score">Score <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('runwayQuarters')" data-col="runwayQuarters">Cash Runway <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('hasShelf')" data-col="hasShelf">Active Shelf <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('dilutionCount')" data-col="dilutionCount">Offerings <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('atmDate')" data-col="atmDate">ATM Filed <span class="sort-icon">↕</span></th>
-            <th onclick="sortBy('price')" data-col="price">Price <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('form')" data-col="form">Form <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('fileDate')" data-col="fileDate">Filed <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('priceAtFiling')" data-col="priceAtFiling">Price at Filing <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('priceNow')" data-col="priceNow">Price Now <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('changePct')" data-col="changePct">Change Since <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('shares')" data-col="shares">Shares O/S <span class="sort-icon">↕</span></th>
             <th>Load</th>
           </tr>
@@ -242,12 +238,12 @@
 // ============================================================
 let aborted = false;
 let allResults = [];
-let sortCol = 'score';
+let sortCol = 'fileDate';
 let sortDir = -1;
 const API_KEY_STORE = 'aim_massive_api_key';
 
 // ============================================================
-// API KEY PERSISTENCE (shared with screener.html / index.html)
+// API KEY PERSISTENCE (shared across all AIM Short pages)
 // ============================================================
 function saveApiKey() {
   const val = document.getElementById('apiKey').value.trim();
@@ -270,8 +266,7 @@ async function checkServerStatus() {
   const el = document.getElementById('serverStatus');
   try {
     const res = await fetch('/api/edgar/search?forms=8-K&startdt=2026-01-01&enddt=2026-01-02');
-    if (res.status === 404) { el.value = 'Not running — see hint below'; return; }
-    el.value = 'Local server detected ✓';
+    el.value = res.status === 404 ? 'Not running — see hint below' : 'Local server detected ✓';
   } catch (e) {
     el.value = 'Not running — see hint below';
   }
@@ -290,7 +285,7 @@ function addLog(msg, type = 'info') {
   const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   const div = document.createElement('div');
   div.className = 'log-entry';
-  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type === 'warn' ? 'log-warn' : type === 'urgent' ? 'log-urgent' : ''}">${msg}</span>`;
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type === 'warn' ? 'log-warn' : ''}">${msg}</span>`;
   entries.insertBefore(div, entries.firstChild);
   while (entries.children.length > 80) entries.removeChild(entries.lastChild);
 }
@@ -313,12 +308,6 @@ async function edgarSearch(params) {
   return res.json();
 }
 
-async function edgarCompanyFacts(cik) {
-  const res = await fetch(`/api/edgar/companyfacts/${cik}`);
-  if (!res.ok) return null;
-  return res.json();
-}
-
 async function massiveJSON(url) {
   const apiKey = document.getElementById('apiKey').value.trim();
   const sep = url.includes('?') ? '&' : '?';
@@ -327,7 +316,7 @@ async function massiveJSON(url) {
   return res.json();
 }
 
-async function batchRun(items, fn, size = 8, delay = 150, onProgress) {
+async function batchRun(items, fn, size = 10, delay = 150, onProgress) {
   const out = [];
   for (let i = 0; i < items.length; i += size) {
     if (aborted) break;
@@ -346,8 +335,6 @@ function extractTicker(displayName) {
   return m[1].split(',')[0].trim();
 }
 
-function cik10(cik) { return String(parseInt(cik, 10)).padStart(10, '0'); }
-
 function isoDaysAgo(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -356,11 +343,14 @@ function isoDaysAgo(days) {
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 // ============================================================
-// MAIN SCREENER
+// MAIN SCANNER
 // ============================================================
 async function runScreener() {
   const apiKey = document.getElementById('apiKey').value.trim();
   if (!apiKey) { showError('Please enter your Massive API key.'); return; }
+
+  const forms = ['424B4', '424B5', '424B3'].filter(f => document.getElementById('form' + f).checked);
+  if (!forms.length) { showError('Select at least one form type.'); return; }
 
   hideError();
   aborted = false;
@@ -369,130 +359,108 @@ async function runScreener() {
 
   const priceMax = parseFloat(document.getElementById('priceMax').value);
   const sharesMax = parseFloat(document.getElementById('sharesMax').value);
-  const atmMonths = parseInt(document.getElementById('atmMonths').value);
-  const dilutionMonths = parseInt(document.getElementById('dilutionMonths').value);
+  const lookbackMonths = parseInt(document.getElementById('lookbackMonths').value);
 
   const scanStart = Date.now();
-  addLog(`Screen started — price < $${priceMax}, shares < ${sharesMax.toLocaleString()}, ATM lookback ${atmMonths}mo`);
+  addLog(`Scan started — forms ${forms.join('/')}, price < $${priceMax}, shares < ${sharesMax.toLocaleString()}, lookback ${lookbackMonths}mo`);
 
   try {
-    // ── STEP 1: ATM sales agreement 8-Ks (paginated) ────────
-    showProgress('Step 1 / 4 — Searching SEC EDGAR for ATM sales agreements...', 5);
-    const startdt = isoDaysAgo(atmMonths * 30);
+    // ── STEP 1: search EDGAR for offering filings (paginated) ──
+    showProgress('Step 1 / 3 — Searching SEC EDGAR for offering filings...', 5);
+    const startdt = isoDaysAgo(lookbackMonths * 30);
     const enddt = todayISO();
 
-    let atmHits = [];
+    let hits = [];
     let from = 0;
     let total = null;
     while (true) {
       if (aborted) return finish();
-      const data = await edgarSearch({
-        q: '"sales agreement" "at-the-market"', forms: '8-K', startdt, enddt, from: String(from),
-      });
+      const data = await edgarSearch({ forms: forms.join(','), startdt, enddt, from: String(from) });
       if (total === null) total = data.hits.total.value;
-      const hits = data.hits.hits;
-      if (!hits.length) break;
-      atmHits.push(...hits);
+      const pageHits = data.hits.hits;
+      if (!pageHits.length) break;
+      hits.push(...pageHits);
       from += 10;
-      showProgress('Step 1 / 4 — Searching SEC EDGAR for ATM sales agreements...',
-        5 + Math.min(from / Math.max(total, 1), 1) * 20,
+      showProgress('Step 1 / 3 — Searching SEC EDGAR for offering filings...',
+        5 + Math.min(from / Math.max(total, 1), 1) * 30,
         `<span>Filings found: <b>${Math.min(from, total)} / ${total}</b></span>`);
-      if (from >= total) break;
+      if (from >= total || from >= 1000) break;  // safety cap
       await sleep(120);
     }
 
     const seen = new Map();
-    atmHits.forEach(h => {
+    hits.forEach(h => {
       const src = h._source;
       const names = src.display_names || [];
       if (!names.length) return;
       const ticker = extractTicker(names[0]);
-      if (!ticker || seen.has(ticker)) return;
+      if (!ticker || seen.has(ticker)) return;  // keep most recent filing per ticker (hits are newest-first)
       seen.set(ticker, {
         ticker, company: names[0].split('(')[0].trim(),
-        cik: (src.ciks || [])[0], atm_8k_date: src.file_date,
+        form: src.form, fileDate: src.file_date, cik: (src.ciks || [])[0],
       });
     });
-    const atmCandidates = [...seen.values()];
-    addLog(`Step 1 complete — ${atmCandidates.length} unique tickers with an ATM sales agreement in the last ${atmMonths} months`);
+    const candidates = [...seen.values()];
+    addLog(`Step 1 complete — ${candidates.length} unique tickers filed ${forms.join('/')} in the last ${lookbackMonths} months`);
 
     if (aborted) return finish();
-    if (!atmCandidates.length) { hideProgress(); addLog('No ATM candidates found.', 'warn'); return finish(); }
+    if (!candidates.length) { hideProgress(); addLog('No offering filings found.', 'warn'); return finish(); }
 
-    // ── STEP 2: price + shares outstanding filter ───────────
-    showProgress('Step 2 / 4 — Checking price & shares outstanding...', 28,
-      `<span>Candidates: <b>${atmCandidates.length}</b></span>`);
+    // ── STEP 2: price & shares outstanding filter ───────────
+    showProgress('Step 2 / 3 — Checking price & shares outstanding...', 40,
+      `<span>Candidates: <b>${candidates.length}</b></span>`);
 
-    const priceChecked = await batchRun(
-      atmCandidates,
+    const checked = await batchRun(
+      candidates,
       async r => {
-        const [priceData, detailData] = await Promise.all([
-          massiveJSON(`https://api.massive.com/v2/aggs/ticker/${r.ticker}/range/1/day/${isoDaysAgo(7)}/${todayISO()}?adjusted=true&sort=desc&limit=5`).catch(() => null),
+        const [detailData] = await Promise.all([
           massiveJSON(`https://api.massive.com/v3/reference/tickers/${r.ticker}`).catch(() => null),
         ]);
-        const results = priceData?.results || [];
-        const close = results.length ? results[0].c : null;
         const detail = detailData?.results || {};
         const shares = detail.share_class_shares_outstanding || detail.weighted_shares_outstanding || null;
-        return { ...r, close, shares };
+        return { ...r, shares };
+      },
+      12, 150,
+      (done, tot) => showProgress('Step 2 / 3 — Checking price & shares outstanding...', 40 + (done / tot) * 25,
+        `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+
+    const floatPassed = checked.filter(r => r && r.shares !== null && r.shares < sharesMax);
+    addLog(`Step 2 complete — ${floatPassed.length} of ${candidates.length} have shares outstanding < ${sharesMax.toLocaleString()}`);
+
+    if (aborted) return finish();
+    if (!floatPassed.length) { hideProgress(); addLog('No candidates passed the float filter.', 'warn'); return finish(); }
+
+    // ── STEP 3: price at filing + price now ─────────────────
+    showProgress('Step 3 / 3 — Checking price at filing & current price...', 68,
+      `<span>Candidates: <b>${floatPassed.length}</b></span>`);
+
+    const withPrices = await batchRun(
+      floatPassed,
+      async r => {
+        const filingWindowEnd = r.fileDate;
+        const filingWindowStart = isoDaysAgo(Math.floor((Date.now() - new Date(r.fileDate)) / 86400000) + 5);
+        const [atFilingData, nowData] = await Promise.all([
+          massiveJSON(`https://api.massive.com/v2/aggs/ticker/${r.ticker}/range/1/day/${filingWindowStart}/${filingWindowEnd}?adjusted=true&sort=desc&limit=5`).catch(() => null),
+          massiveJSON(`https://api.massive.com/v2/aggs/ticker/${r.ticker}/range/1/day/${isoDaysAgo(7)}/${todayISO()}?adjusted=true&sort=desc&limit=5`).catch(() => null),
+        ]);
+        const atFilingResults = atFilingData?.results || [];
+        const nowResults = nowData?.results || [];
+        const priceAtFiling = atFilingResults.length ? atFilingResults[0].c : null;
+        const priceNow = nowResults.length ? nowResults[0].c : null;
+        return { ...r, priceAtFiling, priceNow };
       },
       10, 150,
-      (done, tot) => showProgress('Step 2 / 4 — Checking price & shares outstanding...', 28 + (done / tot) * 27,
+      (done, tot) => showProgress('Step 3 / 3 — Checking price at filing & current price...', 68 + (done / tot) * 27,
         `<span>Checked: <b>${done} / ${tot}</b></span>`)
     );
 
-    const passed = priceChecked.filter(r => r && r.close !== null && r.shares !== null && r.close < priceMax && r.shares < sharesMax);
-    addLog(`Step 2 complete — ${passed.length} of ${atmCandidates.length} pass price < $${priceMax} and shares < ${sharesMax.toLocaleString()}`);
+    const finalResults = withPrices.filter(r => r && r.priceNow !== null && r.priceNow < priceMax).map(r => ({
+      ...r,
+      changePct: (r.priceAtFiling && r.priceNow) ? ((r.priceNow / r.priceAtFiling - 1) * 100) : null,
+    }));
 
-    if (aborted) return finish();
-    if (!passed.length) { hideProgress(); addLog('No candidates passed the price/float filter.', 'warn'); return finish(); }
-
-    // ── STEP 3: dilution history + shelf status ─────────────
-    showProgress('Step 3 / 4 — Checking offering history & shelf status...', 58,
-      `<span>Candidates: <b>${passed.length}</b></span>`);
-
-    const dilStart = isoDaysAgo(dilutionMonths * 30);
-    const enriched1 = await batchRun(
-      passed,
-      async r => {
-        if (!r.cik) return { ...r, dilutionCount: null, hasShelf: false };
-        const cik = cik10(r.cik);
-        const [dilData, shelfData] = await Promise.all([
-          edgarSearch({ forms: '424B3,424B4,424B5', startdt: dilStart, enddt: todayISO(), ciks: cik }).catch(() => null),
-          edgarSearch({ forms: 'S-3,S-3ASR', startdt: dilStart, enddt: todayISO(), ciks: cik }).catch(() => null),
-        ]);
-        return {
-          ...r,
-          dilutionCount: dilData ? dilData.hits.total.value : null,
-          hasShelf: !!(shelfData && shelfData.hits.hits.length),
-        };
-      },
-      6, 200,
-      (done, tot) => showProgress('Step 3 / 4 — Checking offering history & shelf status...', 58 + (done / tot) * 20,
-        `<span>Checked: <b>${done} / ${tot}</b></span>`)
-    );
-
-    if (aborted) return finish();
-
-    // ── STEP 4: cash runway from XBRL ────────────────────────
-    showProgress('Step 4 / 4 — Pulling cash & burn rate from SEC financial data...', 80,
-      `<span>Candidates: <b>${enriched1.length}</b></span>`);
-
-    const enriched2 = await batchRun(
-      enriched1,
-      async r => {
-        if (!r || !r.cik) return r;
-        const facts = await edgarCompanyFacts(cik10(r.cik)).catch(() => null);
-        const runway = computeRunway(facts);
-        return { ...r, cash: runway.cash, burn: runway.burn, runwayQuarters: runway.runwayQuarters };
-      },
-      5, 200,
-      (done, tot) => showProgress('Step 4 / 4 — Pulling cash & burn rate from SEC financial data...', 80 + (done / tot) * 15,
-        `<span>Checked: <b>${done} / ${tot}</b></span>`)
-    );
-
-    // ── SCORE + RENDER ───────────────────────────────────────
-    allResults = enriched2.filter(Boolean).map(r => ({ ...r, score: computeScore(r) }));
+    allResults = finalResults;
     const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
 
     hideProgress();
@@ -500,80 +468,17 @@ async function runScreener() {
     document.getElementById('lastScanTime').textContent =
       `Last scan: ${new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}`;
 
-    const urgent = allResults.filter(r => r.score >= 10).length;
-    addLog(`Screen complete — ${allResults.length} candidates in ${elapsed}s. ${urgent} scored ≥10 (highest apparent urgency).`,
-      urgent ? 'urgent' : 'info');
+    addLog(`Scan complete — ${finalResults.length} candidates in ${elapsed}s (price < $${priceMax} as of today)`);
 
   } catch (err) {
     hideProgress();
-    showError('Screener error: ' + err.message);
+    showError('Scanner error: ' + err.message);
     addLog('Error: ' + err.message, 'warn');
     console.error(err);
   }
 
   finish();
 }
-
-// ============================================================
-// CASH RUNWAY FROM XBRL COMPANY FACTS
-// ============================================================
-function computeRunway(facts) {
-  if (!facts || !facts.facts || !facts.facts['us-gaap']) return { cash: null, burn: null, runwayQuarters: null };
-  const usgaap = facts.facts['us-gaap'];
-
-  function latestValue(tagNames) {
-    for (const tag of tagNames) {
-      const node = usgaap[tag];
-      if (!node || !node.units || !node.units.USD) continue;
-      let units = node.units.USD.filter(u => (u.form || '').startsWith('10-'));
-      if (!units.length) units = node.units.USD;
-      units.sort((a, b) => (a.end || '').localeCompare(b.end || ''));
-      if (units.length) return units[units.length - 1].val;
-    }
-    return null;
-  }
-
-  const cash = latestValue(['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents', 'Cash']);
-
-  let burn = null;
-  const node = usgaap['NetCashProvidedByUsedInOperatingActivities'];
-  if (node && node.units && node.units.USD) {
-    const quarterly = node.units.USD.filter(u => (u.form || '').startsWith('10-Q') && u.start && u.end).map(u => {
-      const start = new Date(u.start), end = new Date(u.end);
-      const days = (end - start) / 86400000;
-      return { ...u, days, end };
-    }).filter(u => u.days >= 80 && u.days <= 100);
-    quarterly.sort((a, b) => a.end - b.end);
-    if (quarterly.length) burn = quarterly[quarterly.length - 1].val;
-  }
-
-  let runwayQuarters = null;
-  if (cash !== null && burn !== null && burn < 0) runwayQuarters = Math.round((cash / Math.abs(burn)) * 100) / 100;
-
-  return { cash, burn, runwayQuarters };
-}
-
-// ============================================================
-// SCORING
-// ============================================================
-function computeScore(r) {
-  let s = 0;
-  const rq = r.runwayQuarters;
-  if (rq !== null && rq !== undefined) {
-    if (rq < 0.5) s += 5;
-    else if (rq < 1) s += 4;
-    else if (rq < 2) s += 3;
-    else if (rq < 3) s += 2;
-    else if (rq < 5) s += 1;
-  }
-  if (r.hasShelf) s += 2;
-  s += Math.min(r.dilutionCount || 0, 5);
-  const daysSince = (Date.now() - new Date(r.atm_8k_date)) / 86400000;
-  s += daysSince <= 30 ? 2 : 1;
-  return s;
-}
-
-function scoreClass(s) { return s >= 10 ? 'score-hi' : s >= 6 ? 'score-mid' : 'score-lo'; }
 
 // ============================================================
 // RESULTS TABLE
@@ -583,7 +488,7 @@ function renderResults() {
   const body = document.getElementById('resultsBody');
 
   if (!allResults.length) {
-    body.innerHTML = '<tr><td colspan="10"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="9"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
     document.getElementById('resultsCount').innerHTML = '<b>0</b> candidates found';
     section.style.display = 'block';
     return;
@@ -591,38 +496,31 @@ function renderResults() {
 
   const sorted = [...allResults].sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
-    if (sortCol === 'hasShelf') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
     if (va === null || va === undefined) va = -Infinity;
     if (vb === null || vb === undefined) vb = -Infinity;
-    // sortDir === -1 means "descending" (highest/latest first), regardless of type.
     if (typeof va === 'string') return sortDir === -1 ? vb.localeCompare(va) : va.localeCompare(vb);
     return sortDir === -1 ? vb - va : va - vb;
   });
 
-  const urgentCount = sorted.filter(r => r.score >= 10).length;
-  document.getElementById('resultsCount').innerHTML =
-    `<b>${sorted.length}</b> candidates &nbsp;·&nbsp; <span style="color:var(--red)"><b>${urgentCount}</b> highest apparent urgency</span> (score ≥10)`;
+  const freshCutoff = Date.now() - 7 * 86400000;
+  document.getElementById('resultsCount').innerHTML = `<b>${sorted.length}</b> candidates found`;
 
   body.innerHTML = sorted.map(r => {
-    const runwayTxt = r.runwayQuarters === null || r.runwayQuarters === undefined ? '—' : r.runwayQuarters.toFixed(2) + ' q';
-    const priceTxt = r.close < 1 ? '$' + r.close.toFixed(4) : '$' + r.close.toFixed(2);
-    const isUrgent = r.score >= 10;
-    return `<tr class="${isUrgent ? 'urgent-row' : ''}">
-      <td><a class="ticker-link" href="https://finance.yahoo.com/quote/${r.ticker}" target="_blank">${r.ticker}</a></td>
+    const isFresh = new Date(r.fileDate).getTime() >= freshCutoff;
+    const priceAtFilingTxt = r.priceAtFiling === null ? '—' : (r.priceAtFiling < 1 ? '$' + r.priceAtFiling.toFixed(4) : '$' + r.priceAtFiling.toFixed(2));
+    const priceNowTxt = r.priceNow < 1 ? '$' + r.priceNow.toFixed(4) : '$' + r.priceNow.toFixed(2);
+    const changeTxt = r.changePct === null ? '—' : (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(1) + '%';
+    const changeClass = r.changePct === null ? '' : (r.changePct >= 0 ? 'up' : 'down');
+    return `<tr class="${isFresh ? 'fresh-row' : ''}">
+      <td><a class="ticker-link" href="https://finance.yahoo.com/quote/${r.ticker}" target="_blank">${r.ticker}</a>${isFresh ? '<span class="tag tag-yellow" style="margin-left:4px">NEW</span>' : ''}</td>
       <td><span class="company-name">${r.company}</span></td>
-      <td>
-        <div class="score-wrap">
-          <span>${r.score}</span>
-          <div class="score-bar"><div class="score-fill ${scoreClass(r.score)}" style="width:${Math.min(r.score*7,100)}%"></div></div>
-        </div>
-      </td>
-      <td class="${r.runwayQuarters !== null && r.runwayQuarters < 1 ? 'down' : ''}">${runwayTxt}</td>
-      <td>${r.hasShelf ? '<span class="tag tag-green">YES</span>' : '<span class="tag tag-muted">no</span>'}</td>
-      <td>${r.dilutionCount ?? '—'}</td>
-      <td>${r.atm_8k_date}</td>
-      <td>${priceTxt}</td>
+      <td><span class="tag tag-muted">${r.form}</span></td>
+      <td>${r.fileDate}</td>
+      <td>${priceAtFilingTxt}</td>
+      <td>${priceNowTxt}</td>
+      <td class="${changeClass}">${changeTxt}</td>
       <td>${r.shares.toLocaleString()}</td>
-      <td><button class="load-btn" onclick="loadIntoAIM('${r.ticker}',${r.close})">Short →</button></td>
+      <td><button class="load-btn" onclick="loadIntoAIM('${r.ticker}',${r.priceNow})">Short →</button></td>
     </tr>`;
   }).join('');
 
@@ -666,15 +564,14 @@ function loadIntoAIM(ticker, price) {
 // ============================================================
 function exportCSV() {
   if (!allResults.length) return;
-  const headers = ['Ticker', 'Company', 'Score', 'Runway (qtrs)', 'Cash', 'Quarterly Burn', 'Active Shelf', 'Offerings', 'ATM Filed', 'Price', 'Shares Outstanding', 'CIK'];
+  const headers = ['Ticker', 'Company', 'Form', 'Filed', 'Price at Filing', 'Price Now', 'Change %', 'Shares Outstanding', 'CIK'];
   const rows = allResults.map(r => [
-    r.ticker, `"${r.company}"`, r.score, r.runwayQuarters ?? '', r.cash ?? '', r.burn ?? '',
-    r.hasShelf ? 'Yes' : 'No', r.dilutionCount ?? '', r.atm_8k_date, r.close, r.shares, r.cik ?? '',
+    r.ticker, `"${r.company}"`, r.form, r.fileDate, r.priceAtFiling ?? '', r.priceNow, r.changePct !== null ? r.changePct.toFixed(2) : '', r.shares, r.cik ?? '',
   ]);
   const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  a.download = `dilution-screen-${todayISO()}.csv`;
+  a.download = `offerings-scan-${todayISO()}.csv`;
   a.click();
 }
 </script>
