@@ -199,8 +199,8 @@
     <div class="grid-2" style="margin-bottom:14px">
       <div class="field">
         <label>Massive API Key</label>
-        <input type="password" id="apiKey" placeholder="Enter your Massive API key...">
-        <div class="hint">Never stored — only used for live API calls</div>
+        <input type="password" id="apiKey" placeholder="Enter your Massive API key..." oninput="saveApiKey()">
+        <div class="hint">Saved only in this browser's local storage — never sent anywhere but Massive, never committed to the repo. <a href="#" onclick="forgetApiKey(); return false" style="color:var(--muted);text-decoration:underline">Forget key</a></div>
       </div>
       <div class="field">
         <label>Exchange</label>
@@ -418,6 +418,27 @@ function updateClock() {
 
 setInterval(updateClock, 1000);
 updateClock();
+
+// ============================================================
+// API KEY PERSISTENCE (browser-local only, never committed/sent elsewhere)
+// ============================================================
+const API_KEY_STORE = 'aim_massive_api_key';
+
+function saveApiKey() {
+  const val = document.getElementById('apiKey').value.trim();
+  if (val) localStorage.setItem(API_KEY_STORE, val);
+  else localStorage.removeItem(API_KEY_STORE);
+}
+
+function forgetApiKey() {
+  localStorage.removeItem(API_KEY_STORE);
+  document.getElementById('apiKey').value = '';
+}
+
+(function loadSavedApiKey() {
+  const saved = localStorage.getItem(API_KEY_STORE);
+  if (saved) document.getElementById('apiKey').value = saved;
+})();
 
 // ============================================================
 // AUTO-SCAN
