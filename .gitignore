@@ -1,3 +1,5 @@
 node_modules/
 data/
 *.local
+start-hidden.vbs
+server.log

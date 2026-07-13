@@ -260,6 +260,31 @@ function forgetApiKey() {
 })();
 
 // ============================================================
+// RESULTS PERSISTENCE — survives navigating away and back
+// ============================================================
+const RESULTS_STORE = 'aim_offerings_results';
+
+function saveResults() {
+  try {
+    localStorage.setItem(RESULTS_STORE, JSON.stringify({ results: allResults, savedAt: new Date().toISOString() }));
+  } catch (e) { /* localStorage full or unavailable — scan still worked, just won't persist */ }
+}
+
+function loadSavedResults() {
+  try {
+    const raw = localStorage.getItem(RESULTS_STORE);
+    if (!raw) return;
+    const { results, savedAt } = JSON.parse(raw);
+    if (!results || !results.length) return;
+    allResults = results;
+    renderResults();
+    const when = new Date(savedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    document.getElementById('lastScanTime').textContent = `Restored from last scan: ${when}`;
+  } catch (e) { /* ignore corrupt storage */ }
+}
+loadSavedResults();
+
+// ============================================================
 // SERVER STATUS CHECK
 // ============================================================
 async function checkServerStatus() {
@@ -464,6 +489,7 @@ async function runScreener() {
     const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
 
     hideProgress();
+    saveResults();
     renderResults();
     document.getElementById('lastScanTime').textContent =
       `Last scan: ${new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}`;
@@ -547,7 +573,9 @@ function stopScreener() { aborted = true; hideProgress(); finish(); }
 
 function clearResults() {
   allResults = [];
+  localStorage.removeItem(RESULTS_STORE);
   document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('lastScanTime').textContent = '';
   hideError(); hideProgress();
 }
 
