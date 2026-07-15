@@ -115,6 +115,8 @@
   .pill-revenue { background: rgba(236,72,153,0.18); color: var(--pink); }
   .pill-debt { background: rgba(148,163,184,0.18); color: #cbd5e1; }
   .pill-guidance { background: rgba(245,158,11,0.18); color: var(--yellow); }
+  .pill-rsi { background: rgba(16,185,129,0.18); color: var(--green); }
+  .pill-macd { background: rgba(16,185,129,0.18); color: var(--green); }
 
   .ticker-link { font-weight: 700; color: var(--blue); text-decoration: none; font-size: 13px; }
   .ticker-link:hover { text-decoration: underline; }
@@ -196,6 +198,11 @@
         <input type="number" id="dilutionMonths" value="18" min="1" max="36">
         <div class="hint">Trailing count of offerings, for scoring only</div>
       </div>
+      <div class="field">
+        <label>RSI Overbought Threshold (15m)</label>
+        <input type="number" id="rsiMin" value="70" min="1" max="100">
+        <div class="hint">RSI(14) on 15-min bars, at/above this gets flagged</div>
+      </div>
     </div>
 
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -237,6 +244,14 @@
           <li><b>Decreasing revenue</b> — deceleration or YoY decline (same $250k floor)</li>
           <li><b>Debt burden</b> — debt/equity, or negative equity</li>
           <li><b>Guidance cuts</b> — best-effort text search of 8-Ks for cut-guidance language; <i>not</i> analyst consensus data (that requires a paid feed) — low recall, absence proves nothing</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <div class="m-title" style="color:var(--green)">🟢 Overbought Momentum (15-min chart)</div>
+        <ul>
+          <li><b>RSI(14) ≥ threshold</b> — computed from real 15-min closes, not a daily/1-min proxy</li>
+          <li><b>MACD bullish</b> — MACD line above its signal line on the same 15-min series</li>
+          <li>Note: raw MACD isn't 0–100 bounded like RSI, so "MACD &gt; 70" isn't meaningful as stated — this uses the standard bullish-crossover reading instead. Say if you meant something else.</li>
         </ul>
       </div>
     </div>
@@ -285,6 +300,8 @@
             <th data-key="marginDeltaPts">Margin Δ</th>
             <th data-key="revYoYPct">Revenue Δ</th>
             <th data-key="debtEquity">D/E</th>
+            <th data-key="rsi15m">RSI (15m)</th>
+            <th data-key="macdBullish">MACD (15m)</th>
             <th data-key="price">Price</th>
             <th data-key="shares">Shares O/S</th>
             <th>Load</th>
@@ -423,6 +440,68 @@ function extractTicker(displayName) {
   const m = displayName.match(/\(([A-Z0-9.\-]+(?:,\s*[A-Z0-9.\-]+)*)\)/);
   if (!m) return null;
   return m[1].split(',')[0].trim();
+}
+
+// ============================================================
+// RSI(14) + MACD(12,26,9) — computed from real 15-min closes.
+// Massive's indicator API is locked to 1-min bars, so these are
+// computed here rather than trusted to an endpoint that can't
+// actually answer "on the 15-min chart."
+// ============================================================
+function computeEMASeries(values, period) {
+  const k = 2 / (period + 1);
+  const out = new Array(values.length).fill(null);
+  let ema = null;
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] === null) continue;
+    if (ema === null) {
+      // seed with a simple average of the first `period` available values
+      const seedSlice = values.slice(i, i + period);
+      if (seedSlice.length < period || seedSlice.some(v => v === null)) { out[i] = null; continue; }
+      ema = seedSlice.reduce((a, b) => a + b, 0) / period;
+      out[i + period - 1] = ema;
+      i += period - 1;
+      continue;
+    }
+    ema = values[i] * k + ema * (1 - k);
+    out[i] = ema;
+  }
+  return out;
+}
+
+function computeRSI(closes, period = 14) {
+  if (closes.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const delta = closes[i] - closes[i - 1];
+    if (delta >= 0) gains += delta; else losses -= delta;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  for (let i = period + 1; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    const gain = delta > 0 ? delta : 0;
+    const loss = delta < 0 ? -delta : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - 100 / (1 + rs);
+}
+
+function computeMACD(closes, fast = 12, slow = 26, signalPeriod = 9) {
+  if (closes.length < slow + signalPeriod) return null;
+  const emaFast = computeEMASeries(closes, fast);
+  const emaSlow = computeEMASeries(closes, slow);
+  const macdLine = closes.map((_, i) => (emaFast[i] !== null && emaSlow[i] !== null) ? emaFast[i] - emaSlow[i] : null);
+  const signalLine = computeEMASeries(macdLine, signalPeriod);
+  // last index where both macd and signal are available
+  for (let i = closes.length - 1; i >= 0; i--) {
+    if (macdLine[i] !== null && signalLine[i] !== null) {
+      return { macd: macdLine[i], signal: signalLine[i], histogram: macdLine[i] - signalLine[i], bullish: macdLine[i] > signalLine[i] };
+    }
+  }
+  return null;
 }
 function cik10(cik) { return String(parseInt(cik, 10)).padStart(10, '0'); }
 function isoDaysAgo(days) { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); }
@@ -575,6 +654,19 @@ function computeScore(r) {
     reasons.push({ cls: 'pill-guidance', label: 'GUIDANCE CUT (text match)', points: 2 });
   }
 
+  // 5) OVERBOUGHT MOMENTUM (15-min chart) — RSI(14) and MACD, computed
+  // from real 15-min closes rather than trusted to Massive's 1-min-only
+  // indicator endpoint.
+  if (r.rsi15m !== null && r.rsi15m !== undefined && r.rsi15m >= r.rsiMinThreshold) {
+    const sub = r.rsi15m >= 80 ? 3 : 2;
+    score += sub;
+    reasons.push({ cls: 'pill-rsi', label: `RSI ${r.rsi15m.toFixed(1)} (overbought)`, points: sub });
+  }
+  if (r.macd15m && r.macd15m.bullish) {
+    score += 2;
+    reasons.push({ cls: 'pill-macd', label: 'MACD BULLISH', points: 2 });
+  }
+
   return { score, reasons };
 }
 
@@ -593,6 +685,7 @@ async function runScreener() {
   const priceMax = parseFloat(document.getElementById('priceMax').value);
   const sharesMax = parseFloat(document.getElementById('sharesMax').value);
   const shortMinThreshold = parseFloat(document.getElementById('shortMin').value);
+  const rsiMinThreshold = parseFloat(document.getElementById('rsiMin').value);
   const atmMonths = parseInt(document.getElementById('atmMonths').value);
   const offeringMonths = parseInt(document.getElementById('offeringMonths').value);
   const dilutionMonths = parseInt(document.getElementById('dilutionMonths').value);
@@ -602,7 +695,7 @@ async function runScreener() {
 
   try {
     // ── STEP 1a: ATM sales agreement 8-Ks ────────────────────
-    showProgress('Step 1 / 6 — Searching SEC EDGAR for ATM sales agreements...', 3);
+    showProgress('Step 1 / 7 — Searching SEC EDGAR for ATM sales agreements...', 3);
     const atmMap = new Map();
     {
       const startdt = isoDaysAgo(atmMonths * 30);
@@ -622,7 +715,7 @@ async function runScreener() {
           atmMap.set(ticker, { ticker, company: names[0].split('(')[0].trim(), cik: (src.ciks || [])[0], atmDate: src.file_date });
         });
         from += 10;
-        showProgress('Step 1 / 6 — Searching SEC EDGAR for ATM sales agreements...', 3 + Math.min(from / Math.max(total, 1), 1) * 12,
+        showProgress('Step 1 / 7 — Searching SEC EDGAR for ATM sales agreements...', 3 + Math.min(from / Math.max(total, 1), 1) * 12,
           `<span>Filings: <b>${Math.min(from, total)} / ${total}</b></span>`);
         if (from >= total || from >= 1000) break;
         await sleep(200);
@@ -631,7 +724,7 @@ async function runScreener() {
     addLog(`Step 1 complete — ${atmMap.size} tickers with a standing ATM in the last ${atmMonths} months`);
 
     // ── STEP 1b: already-priced offerings (424B3/4/5) ───────
-    showProgress('Step 2 / 6 — Searching SEC EDGAR for priced offerings...', 16);
+    showProgress('Step 2 / 7 — Searching SEC EDGAR for priced offerings...', 16);
     const offerMap = new Map();
     {
       const startdt = isoDaysAgo(offeringMonths * 30);
@@ -651,7 +744,7 @@ async function runScreener() {
           offerMap.set(ticker, { ticker, company: names[0].split('(')[0].trim(), cik: (src.ciks || [])[0], form: src.form, fileDate: src.file_date });
         });
         from += 10;
-        showProgress('Step 2 / 6 — Searching SEC EDGAR for priced offerings...', 16 + Math.min(from / Math.max(total, 1), 1) * 14,
+        showProgress('Step 2 / 7 — Searching SEC EDGAR for priced offerings...', 16 + Math.min(from / Math.max(total, 1), 1) * 14,
           `<span>Filings: <b>${Math.min(from, total)} / ${total}</b></span>`);
         if (from >= total || from >= 1000) break;
         await sleep(200);
@@ -675,7 +768,7 @@ async function runScreener() {
     if (!candidates.length) { hideProgress(); addLog('No candidates found.', 'warn'); return finish(); }
 
     // ── STEP 3: price & shares outstanding filter ───────────
-    showProgress('Step 3 / 6 — Checking price & shares outstanding...', 32, `<span>Candidates: <b>${candidates.length}</b></span>`);
+    showProgress('Step 3 / 7 — Checking price & shares outstanding...', 32, `<span>Candidates: <b>${candidates.length}</b></span>`);
     const priceChecked = await batchRun(
       candidates,
       async r => {
@@ -690,7 +783,7 @@ async function runScreener() {
         return { ...r, close, shares };
       },
       10, 160,
-      (done, tot) => showProgress('Step 3 / 6 — Checking price & shares outstanding...', 32 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+      (done, tot) => showProgress('Step 3 / 7 — Checking price & shares outstanding...', 32 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
     );
     const floatPassed = priceChecked.filter(r => r && r.close !== null && r.shares !== null && r.close < priceMax && r.shares < sharesMax);
     addLog(`Step 3 complete — ${floatPassed.length} of ${candidates.length} pass price < $${priceMax} and shares < ${sharesMax.toLocaleString()}`);
@@ -699,7 +792,7 @@ async function runScreener() {
     if (!floatPassed.length) { hideProgress(); addLog('No candidates passed the price/float filter.', 'warn'); return finish(); }
 
     // ── STEP 4: dilution history + shelf + cash runway (ATM candidates) ──
-    showProgress('Step 4 / 6 — Checking dilution history, shelf status & cash runway...', 48, `<span>Candidates: <b>${floatPassed.length}</b></span>`);
+    showProgress('Step 4 / 7 — Checking dilution history, shelf status & cash runway...', 48, `<span>Candidates: <b>${floatPassed.length}</b></span>`);
     const dilStart = isoDaysAgo(dilutionMonths * 30);
     const step4 = await batchRun(
       floatPassed,
@@ -720,13 +813,13 @@ async function runScreener() {
         };
       },
       6, 220,
-      (done, tot) => showProgress('Step 4 / 6 — Checking dilution history, shelf status & cash runway...', 48 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+      (done, tot) => showProgress('Step 4 / 7 — Checking dilution history, shelf status & cash runway...', 48 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
     );
 
     if (aborted) return finish();
 
     // ── STEP 5: short interest ───────────────────────────────
-    showProgress('Step 5 / 6 — Checking short interest...', 64, `<span>Candidates: <b>${step4.length}</b></span>`);
+    showProgress('Step 5 / 7 — Checking short interest...', 64, `<span>Candidates: <b>${step4.length}</b></span>`);
     const step5 = await batchRun(
       step4,
       async r => {
@@ -739,13 +832,13 @@ async function runScreener() {
         return { ...r, shortInterest: si.short_interest, daysToCover: si.days_to_cover, shortPct, shortMinThreshold };
       },
       10, 180,
-      (done, tot) => showProgress('Step 5 / 6 — Checking short interest...', 64 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+      (done, tot) => showProgress('Step 5 / 7 — Checking short interest...', 64 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
     );
 
     if (aborted) return finish();
 
     // ── STEP 6: fundamentals + guidance-cut text search ─────
-    showProgress('Step 6 / 6 — Checking fundamentals & guidance-cut filings...', 80, `<span>Candidates: <b>${step5.length}</b></span>`);
+    showProgress('Step 6 / 7 — Checking fundamentals & guidance-cut filings...', 68, `<span>Candidates: <b>${step5.length}</b></span>`);
     const guidanceQuery = '"lowered guidance" OR "reduced guidance" OR "cut its outlook" OR "lowered its outlook" OR "below previous guidance" OR "revised its outlook downward" OR "lowered its full-year guidance" OR "reduced its full-year outlook"';
     const step6 = await batchRun(
       step5,
@@ -760,11 +853,32 @@ async function runScreener() {
         return { ...r, ...fund, guidanceCut };
       },
       6, 220,
-      (done, tot) => showProgress('Step 6 / 6 — Checking fundamentals & guidance-cut filings...', 80 + (done / tot) * 16, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+      (done, tot) => showProgress('Step 6 / 7 — Checking fundamentals & guidance-cut filings...', 68 + (done / tot) * 12, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+
+    if (aborted) return finish();
+
+    // ── STEP 7: RSI(14) + MACD(12,26,9) on real 15-min bars ──
+    showProgress('Step 7 / 7 — Computing RSI & MACD on 15-min bars...', 80, `<span>Candidates: <b>${step6.length}</b></span>`);
+    const step7 = await batchRun(
+      step6,
+      async r => {
+        if (!r) return r;
+        const barsData = await massiveJSON(
+          `https://api.massive.com/v2/aggs/ticker/${r.ticker}/range/15/minute/${isoDaysAgo(10)}/${todayISO()}?adjusted=true&sort=asc&limit=500`
+        ).catch(() => null);
+        const bars = barsData?.results || [];
+        const closes = bars.map(b => b.c);
+        const rsi15m = computeRSI(closes, 14);
+        const macd15m = computeMACD(closes, 12, 26, 9);
+        return { ...r, rsi15m, macd15m, rsiMinThreshold };
+      },
+      8, 200,
+      (done, tot) => showProgress('Step 7 / 7 — Computing RSI & MACD on 15-min bars...', 80 + (done / tot) * 16, `<span>Checked: <b>${done} / ${tot}</b></span>`)
     );
 
     // ── SCORE + RENDER ───────────────────────────────────────
-    allResults = step6.filter(Boolean).map(r => {
+    allResults = step7.filter(Boolean).map(r => {
       const { score, reasons } = computeScore(r);
       return { ...r, score, reasons };
     });
@@ -833,7 +947,7 @@ function renderResults() {
   const body = document.getElementById('resultsBody');
 
   if (!allResults.length) {
-    body.innerHTML = '<tr><td colspan="12"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="14"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
     document.getElementById('resultsCount').innerHTML = '<b>0</b> candidates found';
     section.style.display = 'block';
     return;
@@ -842,6 +956,7 @@ function renderResults() {
   const sorted = [...allResults].sort((a, b) => {
     let va = a[sortCol], vb = b[sortCol];
     if (sortCol === 'signals') { va = (a.reasons || []).length; vb = (b.reasons || []).length; }
+    if (sortCol === 'macdBullish') { va = a.macd15m && a.macd15m.bullish ? 1 : 0; vb = b.macd15m && b.macd15m.bullish ? 1 : 0; }
     if (va === null || va === undefined) va = -Infinity;
     if (vb === null || vb === undefined) vb = -Infinity;
     if (typeof va === 'string') return sortDir === -1 ? vb.localeCompare(va) : va.localeCompare(vb);
@@ -858,6 +973,8 @@ function renderResults() {
     const marginTxt = r.marginDeltaPts === null || r.marginDeltaPts === undefined ? '<span class="muted-cell">n/a</span>' : `${r.marginDeltaPts >= 0 ? '+' : ''}${r.marginDeltaPts.toFixed(1)}pts`;
     const revTxt = r.revYoYPct === null || r.revYoYPct === undefined ? '<span class="muted-cell">n/a</span>' : `${r.revYoYPct >= 0 ? '+' : ''}${r.revYoYPct.toFixed(0)}%`;
     const debtTxt = r.negativeEquity ? '<span style="color:var(--red);font-weight:700">NEG EQ</span>' : (r.debtEquity === null || r.debtEquity === undefined ? '<span class="muted-cell">n/a</span>' : `${r.debtEquity.toFixed(1)}x`);
+    const rsiTxt = r.rsi15m === null || r.rsi15m === undefined ? '<span class="muted-cell">n/a</span>' : `${r.rsi15m.toFixed(1)}${r.rsi15m >= r.rsiMinThreshold ? ' <span style="color:var(--green)">▲</span>' : ''}`;
+    const macdTxt = !r.macd15m ? '<span class="muted-cell">n/a</span>' : (r.macd15m.bullish ? '<span style="color:var(--green)">bullish</span>' : '<span class="muted-cell">bearish</span>');
     const pills = (r.reasons || []).map(rs => `<span class="pill ${rs.cls}" title="${rs.points} pts">${rs.label}</span>`).join('');
     return `<tr class="${r.score >= 12 ? 'hi-score' : ''}">
       <td><a class="ticker-link" href="https://finance.yahoo.com/quote/${r.ticker}" target="_blank">${r.ticker}</a></td>
@@ -869,6 +986,8 @@ function renderResults() {
       <td>${marginTxt}</td>
       <td>${revTxt}</td>
       <td>${debtTxt}</td>
+      <td>${rsiTxt}</td>
+      <td>${macdTxt}</td>
       <td>${priceTxt}</td>
       <td>${r.shares.toLocaleString()}</td>
       <td><button class="load-btn" onclick="loadIntoAIM('${r.ticker}',${r.close})">Short →</button></td>
@@ -923,6 +1042,7 @@ function exportCSV() {
   if (!allResults.length) return;
   const headers = ['Ticker', 'Company', 'Score', 'Signals', 'Runway (qtrs)', 'Short % Float', 'Days To Cover',
                     'Margin Δ (pts)', 'Revenue Δ %', 'Debt/Equity', 'Negative Equity', 'Guidance Cut (text match)',
+                    'RSI (15m)', 'MACD Bullish (15m)', 'MACD Histogram (15m)',
                     'Price', 'Shares Outstanding', 'Has ATM', 'Has Offering', 'Offering Form', 'Offering Filed', 'CIK'];
   const rows = allResults.map(r => [
     r.ticker, `"${r.company}"`, r.score, `"${(r.reasons || []).map(x => x.label).join('; ')}"`,
@@ -931,6 +1051,9 @@ function exportCSV() {
     r.revYoYPct !== null && r.revYoYPct !== undefined ? r.revYoYPct.toFixed(2) : '',
     r.debtEquity !== null && r.debtEquity !== undefined ? r.debtEquity.toFixed(2) : '',
     r.negativeEquity ? 'Yes' : 'No', r.guidanceCut ? 'Yes' : 'No',
+    r.rsi15m !== null && r.rsi15m !== undefined ? r.rsi15m.toFixed(1) : '',
+    r.macd15m ? (r.macd15m.bullish ? 'Yes' : 'No') : '',
+    r.macd15m && r.macd15m.histogram !== null && r.macd15m.histogram !== undefined ? r.macd15m.histogram.toFixed(4) : '',
     r.close, r.shares, r.hasATM ? 'Yes' : 'No', r.hasOffering ? 'Yes' : 'No', r.offeringForm ?? '', r.offeringFileDate ?? '', r.cik ?? '',
   ]);
   const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
