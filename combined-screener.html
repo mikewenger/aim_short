@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIM Short-Thesis Screener</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3350; --text: #e2e8f0; --muted: #8892b0;
+    --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+    --yellow: #f59e0b; --purple: #8b5cf6; --pink: #ec4899; --orange: #f97316;
+    --green-dim: #064e3b; --red-dim: #450a0a; --blue-dim: #1e3a8a;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header h1 span { color: var(--pink); }
+  header .subtitle { color: var(--muted); font-size: 12px; }
+  .badge { background: var(--blue-dim); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .back-link { color: var(--muted); font-size: 12px; text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 5px; }
+  .back-link:hover { color: var(--text); border-color: var(--blue); }
+
+  .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .field .hint a { color: var(--muted); text-decoration: underline; }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--pink); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #db2777; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--blue); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 11px; color: var(--muted); align-items: center; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot-sm { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* METHODOLOGY */
+  .methodology { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 14px; }
+  .method-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .method-card .m-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .method-card ul { padding-left: 18px; font-size: 11.5px; color: var(--muted); }
+  .method-card li { margin-bottom: 4px; }
+  .method-card li b { color: var(--text); }
+
+  /* PROGRESS */
+  .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; display: none; }
+  .progress-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .progress-bar-bg { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+  .progress-bar-fill { background: var(--pink); height: 100%; border-radius: 4px; transition: width 0.3s; width: 0%; }
+  .progress-stats { display: flex; gap: 20px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .progress-stats b { color: var(--text); }
+
+  /* SCAN LOG */
+  .scan-log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; display: none; max-height: 160px; overflow-y: auto; }
+  .scan-log-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  .log-entry { font-size: 12px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { font-family: monospace; white-space: nowrap; color: var(--muted); }
+  .log-msg { color: var(--text); }
+  .log-warn { color: var(--yellow); }
+
+  /* ALERT */
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert-legal { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow); display: block; line-height: 1.6; }
+
+  /* RESULTS */
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .results-count { font-size: 13px; color: var(--muted); }
+  .results-count b { color: var(--text); }
+
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1180px; }
+  th { background: var(--surface2); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 8px 10px; text-align: right; white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none; z-index: 2; }
+  th:hover { color: var(--text); }
+  th:first-child, th:nth-child(2), th:nth-child(3) { text-align: left; }
+  th .sort-icon { display: inline-block; margin-left: 4px; opacity: 0.4; }
+  th.sorted .sort-icon { opacity: 1; color: var(--blue); }
+  td { padding: 8px 10px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+  td:first-child, td:nth-child(2), td:nth-child(3) { text-align: left; }
+  tr:hover td { background: var(--surface2); }
+  tr.hi-score td { background: rgba(236,72,153,0.05); }
+  tr.hi-score:hover td { background: rgba(236,72,153,0.1); }
+
+  .score-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  .score-bar { width: 46px; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 3px; }
+  .score-hi { background: var(--pink); }
+  .score-mid { background: var(--yellow); }
+  .score-lo { background: var(--green); }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 3px; max-width: 340px; white-space: normal; }
+  .pill { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 3px; font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+  .pill-dilution { background: rgba(239,68,68,0.18); color: var(--red); }
+  .pill-offering { background: rgba(249,115,22,0.18); color: var(--orange); }
+  .pill-short { background: rgba(139,92,246,0.18); color: var(--purple); }
+  .pill-margin { background: rgba(59,130,246,0.18); color: var(--blue); }
+  .pill-revenue { background: rgba(236,72,153,0.18); color: var(--pink); }
+  .pill-debt { background: rgba(148,163,184,0.18); color: #cbd5e1; }
+  .pill-guidance { background: rgba(245,158,11,0.18); color: var(--yellow); }
+
+  .ticker-link { font-weight: 700; color: var(--blue); text-decoration: none; font-size: 13px; }
+  .ticker-link:hover { text-decoration: underline; }
+  .company-name { font-size: 11px; color: var(--muted); display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .load-btn { background: rgba(236,72,153,0.15); color: var(--pink); border: 1px solid rgba(236,72,153,0.3); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .load-btn:hover { background: rgba(236,72,153,0.25); }
+
+  .muted-cell { color: var(--muted); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AIM <span>Short-Thesis Screener</span></h1>
+    <div class="subtitle">Dilution risk + recent offerings + short interest + fundamental deterioration, in one ranked report</div>
+  </div>
+  <a href="index.html" class="back-link">← AIM Short</a>
+  <a href="screener.html" class="back-link">Long Screener</a>
+  <a href="dilution-screener.html" class="back-link">Dilution Only</a>
+  <a href="offerings-screener.html" class="back-link">Offerings Only</a>
+  <span class="badge">v1.0</span>
+</header>
+
+<div class="page">
+
+  <div class="alert alert-legal">
+    <b>What this is and isn't:</b> every input is public — SEC filings, FINRA short-interest data, reported financials. This combines four independent, well-known bearish-thesis concepts into one ranking; it is not advance knowledge of any company's plans, and it is not analyst consensus data (see the guidance-cut note below). Nothing here is investment advice.
+  </div>
+
+  <!-- CONFIG CARD -->
+  <div class="card">
+    <div class="card-title">Configuration</div>
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="field">
+        <label>Massive API Key</label>
+        <input type="password" id="apiKey" placeholder="Enter your Massive API key..." oninput="saveApiKey()">
+        <div class="hint">Saved only in this browser's local storage. <a href="#" onclick="forgetApiKey(); return false">Forget key</a></div>
+      </div>
+      <div class="field">
+        <label>Server status</label>
+        <input type="text" id="serverStatus" readonly value="Checking...">
+        <div class="hint">SEC's API has no CORS support, so this scan needs the local server (<code>npm start</code>) — it won't work on a static GitHub Pages deploy.</div>
+      </div>
+    </div>
+
+    <div class="card-title" style="margin-bottom:10px">Universe &amp; Thresholds</div>
+    <div class="grid-3" style="margin-bottom:16px">
+      <div class="field">
+        <label>Max Price ($)</label>
+        <input type="number" id="priceMax" value="5" step="0.5">
+      </div>
+      <div class="field">
+        <label>Max Shares Outstanding</label>
+        <input type="number" id="sharesMax" value="20000000" step="1000000">
+      </div>
+      <div class="field">
+        <label>High Short Interest Threshold (%)</label>
+        <input type="number" id="shortMin" value="10" step="1">
+        <div class="hint">Short interest ÷ shares outstanding, at/above this % gets flagged</div>
+      </div>
+      <div class="field">
+        <label>ATM Filing Lookback (months)</label>
+        <input type="number" id="atmMonths" value="4" min="1" max="24">
+        <div class="hint">Standing ATM sales agreements (8-K search)</div>
+      </div>
+      <div class="field">
+        <label>Offering Lookback (months)</label>
+        <input type="number" id="offeringMonths" value="2" min="1" max="24">
+        <div class="hint">Already-priced 424B3/4/5 offerings</div>
+      </div>
+      <div class="field">
+        <label>Dilution History Window (months)</label>
+        <input type="number" id="dilutionMonths" value="18" min="1" max="36">
+        <div class="hint">Trailing count of offerings, for scoring only</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="runBtn" onclick="runScreener()">▶ Run Combined Scan</button>
+      <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopScreener()" style="display:none">■ Stop</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearResults()">Clear</button>
+    </div>
+
+    <div class="methodology">
+      <div class="method-card">
+        <div class="m-title" style="color:var(--red)">🔴 Dilution Risk (forward-looking)</div>
+        <ul>
+          <li>Has a <b>standing ATM</b> sales agreement (8-K)</li>
+          <li><b>Cash runway</b> — cash ÷ quarterly burn</li>
+          <li><b>Active shelf</b> registration (S-3/S-3ASR)</li>
+          <li><b>Offering frequency</b>, trailing 18mo</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <div class="m-title" style="color:var(--orange)">🟠 Recent Offering (reactive)</div>
+        <ul>
+          <li>Already filed a <b>424B3/4/5</b> prospectus</li>
+          <li>Scored by <b>recency</b> of the filing</li>
+          <li>Bonus if price has <b>kept falling</b> since filing</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <div class="m-title" style="color:var(--purple)">🟣 High Short Interest &amp; Float</div>
+        <ul>
+          <li><b>Short interest ÷ shares outstanding</b> ≥ your threshold</li>
+          <li>Higher % scores higher (10 / 20 / 30%+ tiers)</li>
+          <li>Days-to-cover shown alongside for context</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <div class="m-title" style="color:var(--blue)">🔵🟤⚫🟡 Fundamental Weakness</div>
+        <ul>
+          <li><b>Falling margins</b> — gross margin, this quarter vs. last (needs ≥$250k quarterly revenue to avoid noise)</li>
+          <li><b>Decreasing revenue</b> — deceleration or YoY decline (same $250k floor)</li>
+          <li><b>Debt burden</b> — debt/equity, or negative equity</li>
+          <li><b>Guidance cuts</b> — best-effort text search of 8-Ks for cut-guidance language; <i>not</i> analyst consensus data (that requires a paid feed) — low recall, absence proves nothing</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="alert alert-error" id="errorAlert"></div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">Initializing...</div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-stats" id="progressStats"></div>
+  </div>
+
+  <!-- SCAN LOG -->
+  <div class="scan-log" id="scanLog">
+    <div class="scan-log-title">Scan Log</div>
+    <div id="scanLogEntries"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" style="display:none">
+    <div class="results-header">
+      <div class="results-count" id="resultsCount"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="lastScanTime" style="font-size:12px;color:var(--muted)"></span>
+        <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ CSV</button>
+      </div>
+    </div>
+    <div class="legend" style="margin-bottom:10px">
+      <span><span class="dot-sm" style="background:var(--pink)"></span> Score ≥ 12 highest</span>
+      <span><span class="dot-sm" style="background:var(--yellow)"></span> 6–11 moderate</span>
+      <span><span class="dot-sm" style="background:var(--green)"></span> &lt; 6 lower</span>
+    </div>
+    <div class="table-wrap">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th data-key="ticker">Ticker</th>
+            <th data-key="company">Company</th>
+            <th data-key="signals">Why it's here</th>
+            <th data-key="score">Score</th>
+            <th data-key="runwayQuarters">Runway</th>
+            <th data-key="shortPct">Short % Float</th>
+            <th data-key="marginDeltaPts">Margin Δ</th>
+            <th data-key="revYoYPct">Revenue Δ</th>
+            <th data-key="debtEquity">D/E</th>
+            <th data-key="price">Price</th>
+            <th data-key="shares">Shares O/S</th>
+            <th>Load</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let aborted = false;
+let allResults = [];
+let sortCol = 'score';
+let sortDir = -1;
+const API_KEY_STORE = 'aim_massive_api_key';
+const RESULTS_STORE = 'aim_combined_results';
+
+// ============================================================
+// API KEY PERSISTENCE (shared across all AIM Short pages)
+// ============================================================
+function saveApiKey() {
+  const val = document.getElementById('apiKey').value.trim();
+  if (val) localStorage.setItem(API_KEY_STORE, val);
+  else localStorage.removeItem(API_KEY_STORE);
+}
+function forgetApiKey() {
+  localStorage.removeItem(API_KEY_STORE);
+  document.getElementById('apiKey').value = '';
+}
+(function loadSavedApiKey() {
+  const saved = localStorage.getItem(API_KEY_STORE);
+  if (saved) document.getElementById('apiKey').value = saved;
+})();
+
+// ============================================================
+// RESULTS PERSISTENCE — survives navigating away and back
+// ============================================================
+function saveResults() {
+  try {
+    localStorage.setItem(RESULTS_STORE, JSON.stringify({ results: allResults, savedAt: new Date().toISOString() }));
+  } catch (e) { /* localStorage full or unavailable — scan still worked, just won't persist */ }
+}
+function loadSavedResults() {
+  try {
+    const raw = localStorage.getItem(RESULTS_STORE);
+    if (!raw) return;
+    const { results, savedAt } = JSON.parse(raw);
+    if (!results || !results.length) return;
+    allResults = results;
+    renderResults();
+    const when = new Date(savedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    document.getElementById('lastScanTime').textContent = `Restored from last scan: ${when}`;
+  } catch (e) { /* ignore corrupt storage */ }
+}
+loadSavedResults();
+
+// ============================================================
+// SERVER STATUS CHECK
+// ============================================================
+async function checkServerStatus() {
+  const el = document.getElementById('serverStatus');
+  try {
+    const res = await fetch('/api/edgar/search?forms=8-K&startdt=2026-01-01&enddt=2026-01-02');
+    el.value = res.status === 404 ? 'Not running — see hint below' : 'Local server detected ✓';
+  } catch (e) {
+    el.value = 'Not running — see hint below';
+  }
+}
+checkServerStatus();
+
+// ============================================================
+// HELPERS
+// ============================================================
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function addLog(msg, type = 'info') {
+  const log = document.getElementById('scanLog');
+  const entries = document.getElementById('scanLogEntries');
+  log.style.display = 'block';
+  const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type === 'warn' ? 'log-warn' : ''}">${msg}</span>`;
+  entries.insertBefore(div, entries.firstChild);
+  while (entries.children.length > 100) entries.removeChild(entries.lastChild);
+}
+
+function showProgress(label, pct, stats = '') {
+  const wrap = document.getElementById('progressWrap');
+  wrap.style.display = 'block';
+  document.getElementById('progressLabel').textContent = label;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStats').innerHTML = stats;
+}
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+function showError(msg) { const el = document.getElementById('errorAlert'); el.textContent = msg; el.style.display = 'block'; }
+function hideError() { document.getElementById('errorAlert').style.display = 'none'; }
+
+async function edgarSearch(params) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`/api/edgar/search?${qs}`);
+  if (!res.ok) throw new Error(`EDGAR search HTTP ${res.status} — is the local server running (npm start)?`);
+  return res.json();
+}
+async function edgarCompanyFacts(cik) {
+  const res = await fetch(`/api/edgar/companyfacts/${cik}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+async function massiveJSON(url) {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(url + sep + 'apiKey=' + encodeURIComponent(apiKey));
+  if (!res.ok) throw new Error(`Massive HTTP ${res.status}`);
+  return res.json();
+}
+async function batchRun(items, fn, size = 8, delay = 180, onProgress) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) {
+    if (aborted) break;
+    const batch = items.slice(i, i + size);
+    const results = await Promise.all(batch.map(item => fn(item).catch(() => null)));
+    out.push(...results);
+    if (onProgress) onProgress(Math.min(i + size, items.length), items.length);
+    if (i + size < items.length) await sleep(delay);
+  }
+  return out;
+}
+function extractTicker(displayName) {
+  const m = displayName.match(/\(([A-Z0-9.\-]+(?:,\s*[A-Z0-9.\-]+)*)\)/);
+  if (!m) return null;
+  return m[1].split(',')[0].trim();
+}
+function cik10(cik) { return String(parseInt(cik, 10)).padStart(10, '0'); }
+function isoDaysAgo(days) { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().slice(0, 10); }
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+// ============================================================
+// FUNDAMENTALS ANALYSIS (from raw financials line items)
+// ============================================================
+function analyzeFundamentals(financialsResults) {
+  const out = { marginDeltaPts: null, marginLatestPct: null, revYoYPct: null, revTrend: null,
+                debtEquity: null, negativeEquity: false, hasRevenueData: false, hasBalanceData: false };
+  if (!financialsResults || !financialsResults.length) return out;
+
+  // financialsResults assumed sorted most-recent-first (as the API returns by default)
+  const periods = financialsResults.map(r => {
+    const inc = (r.financials || {}).income_statement || {};
+    const bal = (r.financials || {}).balance_sheet || {};
+    return {
+      end: r.end_date,
+      revenue: inc.revenues ? inc.revenues.value : null,
+      grossProfit: inc.gross_profit ? inc.gross_profit.value : null,
+      liabilities: bal.liabilities ? bal.liabilities.value : null,
+      equity: bal.equity ? bal.equity.value : null,
+    };
+  });
+
+  // Below this, quarterly revenue is too small/lumpy (grants, licensing, etc.) for
+  // a % change to mean anything -- a company can go from $8k to $40k revenue and
+  // "grow 400%" without that telling you anything about its actual trajectory.
+  const MIN_QUARTERLY_REVENUE = 250000;
+
+  // Margins: compare latest two periods with usable revenue+gross profit.
+  // Gross margin outside roughly -100%..100% almost always means a source-data
+  // tagging error (seen in practice: one filer's XBRL reported gross profit at
+  // 50x its own revenue) rather than a real number -- reject rather than show it.
+  const plausibleMargin = m => m !== null && Math.abs(m) <= 100;
+  const withMargin = periods.filter(p => p.revenue && Math.abs(p.revenue) >= MIN_QUARTERLY_REVENUE && p.grossProfit !== null);
+  if (withMargin.length >= 2) {
+    const m0 = withMargin[0].grossProfit / withMargin[0].revenue * 100;
+    const m1 = withMargin[1].grossProfit / withMargin[1].revenue * 100;
+    if (plausibleMargin(m0) && plausibleMargin(m1)) {
+      out.hasRevenueData = true;
+      out.marginLatestPct = m0;
+      out.marginDeltaPts = m0 - m1;
+    }
+  }
+
+  // Revenue trend: need at least 3 periods with revenue to detect deceleration
+  const withRev = periods.filter(p => p.revenue && Math.abs(p.revenue) >= MIN_QUARTERLY_REVENUE);
+  if (withRev.length >= 2) {
+    out.hasRevenueData = true;
+    const latestGrowth = (withRev[0].revenue - withRev[1].revenue) / Math.abs(withRev[1].revenue) * 100;
+    out.revYoYPct = latestGrowth;
+    if (withRev.length >= 3) {
+      const priorGrowth = (withRev[1].revenue - withRev[2].revenue) / Math.abs(withRev[2].revenue) * 100;
+      if (latestGrowth < 0) out.revTrend = 'declining';
+      else if (latestGrowth < priorGrowth) out.revTrend = 'decelerating';
+      else out.revTrend = 'stable_or_improving';
+    } else {
+      out.revTrend = latestGrowth < 0 ? 'declining' : 'stable_or_improving';
+    }
+  }
+
+  // Debt: most recent balance sheet snapshot
+  const withBal = periods.filter(p => p.liabilities !== null && p.equity !== null);
+  if (withBal.length) {
+    out.hasBalanceData = true;
+    const latest = withBal[0];
+    if (latest.equity <= 0) out.negativeEquity = true;
+    else out.debtEquity = latest.liabilities / latest.equity;
+  }
+
+  return out;
+}
+
+// ============================================================
+// SCORING — every concept below is independently visible AND
+// contributes points, so sort order = importance + strength.
+// ============================================================
+function computeScore(r) {
+  const reasons = [];
+  let score = 0;
+
+  // 1) DILUTION RISK (forward-looking, ATM-based)
+  if (r.hasATM) {
+    let sub = 0;
+    const rq = r.runwayQuarters;
+    if (rq !== null && rq !== undefined) {
+      if (rq < 0.5) sub += 5; else if (rq < 1) sub += 4; else if (rq < 2) sub += 3;
+      else if (rq < 3) sub += 2; else if (rq < 5) sub += 1;
+    }
+    if (r.hasShelf) sub += 2;
+    sub += Math.min(r.dilutionCount18mo || 0, 5);
+    const daysSinceAtm = (Date.now() - new Date(r.atmDate)) / 86400000;
+    sub += daysSinceAtm <= 30 ? 2 : 1;
+    score += sub;
+    const runwayTxt = rq !== null && rq !== undefined ? `${rq.toFixed(2)}q runway` : 'standing ATM';
+    reasons.push({ cls: 'pill-dilution', label: `DILUTION ${runwayTxt}`, points: sub });
+  }
+
+  // 2) RECENT OFFERING (reactive, 424B-based)
+  if (r.hasOffering) {
+    let sub = 0;
+    const daysSinceFiling = (Date.now() - new Date(r.offeringFileDate)) / 86400000;
+    sub += daysSinceFiling <= 7 ? 3 : daysSinceFiling <= 30 ? 2 : 1;
+    let changeTxt = '';
+    if (r.priceAtFiling && r.close) {
+      const chg = (r.close / r.priceAtFiling - 1) * 100;
+      if (chg <= -20) sub += 2; else if (chg <= -10) sub += 1;
+      changeTxt = ` ${chg >= 0 ? '+' : ''}${chg.toFixed(0)}%`;
+    }
+    score += sub;
+    reasons.push({ cls: 'pill-offering', label: `OFFERING${changeTxt} (${r.offeringForm})`, points: sub });
+  }
+
+  // 3) HIGH SHORT INTEREST & FLOAT
+  if (r.shortPct !== null && r.shortPct !== undefined && r.shortPct >= r.shortMinThreshold) {
+    let sub = 0;
+    if (r.shortPct >= 30) sub = 5; else if (r.shortPct >= 20) sub = 4; else sub = 2;
+    score += sub;
+    reasons.push({ cls: 'pill-short', label: `SHORT ${r.shortPct.toFixed(1)}%`, points: sub });
+  }
+
+  // 4) FUNDAMENTAL WEAKNESS — each sub-signal independently visible
+  if (r.marginDeltaPts !== null && r.marginDeltaPts !== undefined && r.marginDeltaPts < 0) {
+    const d = Math.abs(r.marginDeltaPts);
+    const sub = d > 5 ? 3 : d > 2 ? 2 : 1;
+    score += sub;
+    reasons.push({ cls: 'pill-margin', label: `MARGIN ${r.marginDeltaPts.toFixed(1)}pts`, points: sub });
+  }
+  if (r.revTrend === 'declining' || r.revTrend === 'decelerating') {
+    const sub = r.revTrend === 'declining' ? 3 : 2;
+    score += sub;
+    const revTxt = r.revYoYPct !== null ? `${r.revYoYPct >= 0 ? '+' : ''}${r.revYoYPct.toFixed(0)}%` : '';
+    reasons.push({ cls: 'pill-revenue', label: `REV ${r.revTrend === 'declining' ? 'DECLINING' : 'DECELERATING'} ${revTxt}`, points: sub });
+  }
+  if (r.negativeEquity) {
+    score += 4;
+    reasons.push({ cls: 'pill-debt', label: 'NEGATIVE EQUITY', points: 4 });
+  } else if (r.debtEquity !== null && r.debtEquity !== undefined) {
+    let sub = 0;
+    if (r.debtEquity >= 3) sub = 3; else if (r.debtEquity >= 2) sub = 2; else if (r.debtEquity >= 1.5) sub = 1;
+    if (sub > 0) {
+      score += sub;
+      reasons.push({ cls: 'pill-debt', label: `DEBT ${r.debtEquity.toFixed(1)}x`, points: sub });
+    }
+  }
+  if (r.guidanceCut) {
+    score += 2;
+    reasons.push({ cls: 'pill-guidance', label: 'GUIDANCE CUT (text match)', points: 2 });
+  }
+
+  return { score, reasons };
+}
+
+// ============================================================
+// MAIN SCANNER
+// ============================================================
+async function runScreener() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showError('Please enter your Massive API key.'); return; }
+
+  hideError();
+  aborted = false;
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = 'inline-flex';
+
+  const priceMax = parseFloat(document.getElementById('priceMax').value);
+  const sharesMax = parseFloat(document.getElementById('sharesMax').value);
+  const shortMinThreshold = parseFloat(document.getElementById('shortMin').value);
+  const atmMonths = parseInt(document.getElementById('atmMonths').value);
+  const offeringMonths = parseInt(document.getElementById('offeringMonths').value);
+  const dilutionMonths = parseInt(document.getElementById('dilutionMonths').value);
+
+  const scanStart = Date.now();
+  addLog(`Combined scan started — price < $${priceMax}, shares < ${sharesMax.toLocaleString()}, short ≥ ${shortMinThreshold}%`);
+
+  try {
+    // ── STEP 1a: ATM sales agreement 8-Ks ────────────────────
+    showProgress('Step 1 / 6 — Searching SEC EDGAR for ATM sales agreements...', 3);
+    const atmMap = new Map();
+    {
+      const startdt = isoDaysAgo(atmMonths * 30);
+      let from = 0, total = null;
+      while (true) {
+        if (aborted) return finish();
+        const data = await edgarSearch({ q: '"sales agreement" "at-the-market"', forms: '8-K', startdt, enddt: todayISO(), from: String(from) });
+        if (total === null) total = data.hits.total.value;
+        const hits = data.hits.hits;
+        if (!hits.length) break;
+        hits.forEach(h => {
+          const src = h._source;
+          const names = src.display_names || [];
+          if (!names.length) return;
+          const ticker = extractTicker(names[0]);
+          if (!ticker || atmMap.has(ticker)) return;
+          atmMap.set(ticker, { ticker, company: names[0].split('(')[0].trim(), cik: (src.ciks || [])[0], atmDate: src.file_date });
+        });
+        from += 10;
+        showProgress('Step 1 / 6 — Searching SEC EDGAR for ATM sales agreements...', 3 + Math.min(from / Math.max(total, 1), 1) * 12,
+          `<span>Filings: <b>${Math.min(from, total)} / ${total}</b></span>`);
+        if (from >= total || from >= 1000) break;
+        await sleep(200);
+      }
+    }
+    addLog(`Step 1 complete — ${atmMap.size} tickers with a standing ATM in the last ${atmMonths} months`);
+
+    // ── STEP 1b: already-priced offerings (424B3/4/5) ───────
+    showProgress('Step 2 / 6 — Searching SEC EDGAR for priced offerings...', 16);
+    const offerMap = new Map();
+    {
+      const startdt = isoDaysAgo(offeringMonths * 30);
+      let from = 0, total = null;
+      while (true) {
+        if (aborted) return finish();
+        const data = await edgarSearch({ forms: '424B3,424B4,424B5', startdt, enddt: todayISO(), from: String(from) });
+        if (total === null) total = data.hits.total.value;
+        const hits = data.hits.hits;
+        if (!hits.length) break;
+        hits.forEach(h => {
+          const src = h._source;
+          const names = src.display_names || [];
+          if (!names.length) return;
+          const ticker = extractTicker(names[0]);
+          if (!ticker || offerMap.has(ticker)) return;  // keep most recent (hits are newest-first)
+          offerMap.set(ticker, { ticker, company: names[0].split('(')[0].trim(), cik: (src.ciks || [])[0], form: src.form, fileDate: src.file_date });
+        });
+        from += 10;
+        showProgress('Step 2 / 6 — Searching SEC EDGAR for priced offerings...', 16 + Math.min(from / Math.max(total, 1), 1) * 14,
+          `<span>Filings: <b>${Math.min(from, total)} / ${total}</b></span>`);
+        if (from >= total || from >= 1000) break;
+        await sleep(200);
+      }
+    }
+    addLog(`Step 2 complete — ${offerMap.size} tickers filed an offering in the last ${offeringMonths} months`);
+
+    if (aborted) return finish();
+
+    // ── MERGE UNIVERSE ───────────────────────────────────────
+    const universe = new Map();
+    atmMap.forEach((v, k) => universe.set(k, { ticker: k, company: v.company, cik: v.cik, hasATM: true, atmDate: v.atmDate, hasOffering: false }));
+    offerMap.forEach((v, k) => {
+      const existing = universe.get(k);
+      if (existing) { existing.hasOffering = true; existing.offeringForm = v.form; existing.offeringFileDate = v.fileDate; existing.cik = existing.cik || v.cik; }
+      else universe.set(k, { ticker: k, company: v.company, cik: v.cik, hasATM: false, hasOffering: true, offeringForm: v.form, offeringFileDate: v.fileDate });
+    });
+    const candidates = [...universe.values()];
+    addLog(`Combined universe — ${candidates.length} unique tickers (${atmMap.size} ATM + ${offerMap.size} offerings, deduped)`);
+
+    if (!candidates.length) { hideProgress(); addLog('No candidates found.', 'warn'); return finish(); }
+
+    // ── STEP 3: price & shares outstanding filter ───────────
+    showProgress('Step 3 / 6 — Checking price & shares outstanding...', 32, `<span>Candidates: <b>${candidates.length}</b></span>`);
+    const priceChecked = await batchRun(
+      candidates,
+      async r => {
+        const [priceData, detailData] = await Promise.all([
+          massiveJSON(`https://api.massive.com/v2/aggs/ticker/${r.ticker}/range/1/day/${isoDaysAgo(7)}/${todayISO()}?adjusted=true&sort=desc&limit=5`).catch(() => null),
+          massiveJSON(`https://api.massive.com/v3/reference/tickers/${r.ticker}`).catch(() => null),
+        ]);
+        const results = priceData?.results || [];
+        const close = results.length ? results[0].c : null;
+        const detail = detailData?.results || {};
+        const shares = detail.share_class_shares_outstanding || detail.weighted_shares_outstanding || null;
+        return { ...r, close, shares };
+      },
+      10, 160,
+      (done, tot) => showProgress('Step 3 / 6 — Checking price & shares outstanding...', 32 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+    const floatPassed = priceChecked.filter(r => r && r.close !== null && r.shares !== null && r.close < priceMax && r.shares < sharesMax);
+    addLog(`Step 3 complete — ${floatPassed.length} of ${candidates.length} pass price < $${priceMax} and shares < ${sharesMax.toLocaleString()}`);
+
+    if (aborted) return finish();
+    if (!floatPassed.length) { hideProgress(); addLog('No candidates passed the price/float filter.', 'warn'); return finish(); }
+
+    // ── STEP 4: dilution history + shelf + cash runway (ATM candidates) ──
+    showProgress('Step 4 / 6 — Checking dilution history, shelf status & cash runway...', 48, `<span>Candidates: <b>${floatPassed.length}</b></span>`);
+    const dilStart = isoDaysAgo(dilutionMonths * 30);
+    const step4 = await batchRun(
+      floatPassed,
+      async r => {
+        if (!r.cik) return { ...r, runwayQuarters: null, hasShelf: false, dilutionCount18mo: null };
+        const cik = cik10(r.cik);
+        const [dilData, shelfData, facts] = await Promise.all([
+          edgarSearch({ forms: '424B3,424B4,424B5', startdt: dilStart, enddt: todayISO(), ciks: cik }).catch(() => null),
+          edgarSearch({ forms: 'S-3,S-3ASR', startdt: dilStart, enddt: todayISO(), ciks: cik }).catch(() => null),
+          edgarCompanyFacts(cik).catch(() => null),
+        ]);
+        const runway = computeRunway(facts);
+        return {
+          ...r,
+          dilutionCount18mo: dilData ? dilData.hits.total.value : null,
+          hasShelf: !!(shelfData && shelfData.hits.hits.length),
+          runwayQuarters: runway.runwayQuarters,
+        };
+      },
+      6, 220,
+      (done, tot) => showProgress('Step 4 / 6 — Checking dilution history, shelf status & cash runway...', 48 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+
+    if (aborted) return finish();
+
+    // ── STEP 5: short interest ───────────────────────────────
+    showProgress('Step 5 / 6 — Checking short interest...', 64, `<span>Candidates: <b>${step4.length}</b></span>`);
+    const step5 = await batchRun(
+      step4,
+      async r => {
+        if (!r) return r;
+        const data = await massiveJSON(`https://api.massive.com/stocks/v1/short-interest?ticker=${r.ticker}&limit=1&sort=settlement_date.desc`).catch(() => null);
+        const res = data?.results || [];
+        if (!res.length) return { ...r, shortInterest: null, daysToCover: null, shortPct: null, shortMinThreshold };
+        const si = res[0];
+        const shortPct = r.shares ? (si.short_interest / r.shares) * 100 : null;
+        return { ...r, shortInterest: si.short_interest, daysToCover: si.days_to_cover, shortPct, shortMinThreshold };
+      },
+      10, 180,
+      (done, tot) => showProgress('Step 5 / 6 — Checking short interest...', 64 + (done / tot) * 14, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+
+    if (aborted) return finish();
+
+    // ── STEP 6: fundamentals + guidance-cut text search ─────
+    showProgress('Step 6 / 6 — Checking fundamentals & guidance-cut filings...', 80, `<span>Candidates: <b>${step5.length}</b></span>`);
+    const guidanceQuery = '"lowered guidance" OR "reduced guidance" OR "cut its outlook" OR "lowered its outlook" OR "below previous guidance" OR "revised its outlook downward" OR "lowered its full-year guidance" OR "reduced its full-year outlook"';
+    const step6 = await batchRun(
+      step5,
+      async r => {
+        if (!r) return r;
+        const [finData, guidanceData] = await Promise.all([
+          massiveJSON(`https://api.massive.com/vX/reference/financials?ticker=${r.ticker}&timeframe=quarterly&limit=6`).catch(() => null),
+          r.cik ? edgarSearch({ q: guidanceQuery, forms: '8-K', startdt: isoDaysAgo(180), enddt: todayISO(), ciks: cik10(r.cik) }).catch(() => null) : Promise.resolve(null),
+        ]);
+        const fund = analyzeFundamentals(finData?.results);
+        const guidanceCut = !!(guidanceData && guidanceData.hits.hits.length);
+        return { ...r, ...fund, guidanceCut };
+      },
+      6, 220,
+      (done, tot) => showProgress('Step 6 / 6 — Checking fundamentals & guidance-cut filings...', 80 + (done / tot) * 16, `<span>Checked: <b>${done} / ${tot}</b></span>`)
+    );
+
+    // ── SCORE + RENDER ───────────────────────────────────────
+    allResults = step6.filter(Boolean).map(r => {
+      const { score, reasons } = computeScore(r);
+      return { ...r, score, reasons };
+    });
+    const elapsed = ((Date.now() - scanStart) / 1000).toFixed(1);
+
+    hideProgress();
+    saveResults();
+    renderResults();
+    document.getElementById('lastScanTime').textContent =
+      `Last scan: ${new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}`;
+
+    const hi = allResults.filter(r => r.score >= 12).length;
+    addLog(`Scan complete — ${allResults.length} candidates in ${elapsed}s. ${hi} scored ≥12 (highest apparent conviction).`);
+
+  } catch (err) {
+    hideProgress();
+    showError('Scanner error: ' + err.message);
+    addLog('Error: ' + err.message, 'warn');
+    console.error(err);
+  }
+
+  finish();
+}
+
+// ============================================================
+// CASH RUNWAY FROM XBRL COMPANY FACTS (same as dilution screener)
+// ============================================================
+function computeRunway(facts) {
+  if (!facts || !facts.facts || !facts.facts['us-gaap']) return { runwayQuarters: null };
+  const usgaap = facts.facts['us-gaap'];
+  function latestValue(tagNames) {
+    for (const tag of tagNames) {
+      const node = usgaap[tag];
+      if (!node || !node.units || !node.units.USD) continue;
+      let units = node.units.USD.filter(u => (u.form || '').startsWith('10-'));
+      if (!units.length) units = node.units.USD;
+      units.sort((a, b) => (a.end || '').localeCompare(b.end || ''));
+      if (units.length) return units[units.length - 1].val;
+    }
+    return null;
+  }
+  const cash = latestValue(['CashAndCashEquivalentsAtCarryingValue', 'CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents', 'Cash']);
+  let burn = null;
+  const node = usgaap['NetCashProvidedByUsedInOperatingActivities'];
+  if (node && node.units && node.units.USD) {
+    const quarterly = node.units.USD.filter(u => (u.form || '').startsWith('10-Q') && u.start && u.end).map(u => {
+      const start = new Date(u.start), end = new Date(u.end);
+      const days = (end - start) / 86400000;
+      return { ...u, days, end };
+    }).filter(u => u.days >= 80 && u.days <= 100);
+    quarterly.sort((a, b) => a.end - b.end);
+    if (quarterly.length) burn = quarterly[quarterly.length - 1].val;
+  }
+  let runwayQuarters = null;
+  if (cash !== null && burn !== null && burn < 0) runwayQuarters = Math.round((cash / Math.abs(burn)) * 100) / 100;
+  return { runwayQuarters };
+}
+
+function scoreClass(s) { return s >= 12 ? 'score-hi' : s >= 6 ? 'score-mid' : 'score-lo'; }
+
+// ============================================================
+// RESULTS TABLE
+// ============================================================
+function renderResults() {
+  const section = document.getElementById('resultsSection');
+  const body = document.getElementById('resultsBody');
+
+  if (!allResults.length) {
+    body.innerHTML = '<tr><td colspan="12"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
+    document.getElementById('resultsCount').innerHTML = '<b>0</b> candidates found';
+    section.style.display = 'block';
+    return;
+  }
+
+  const sorted = [...allResults].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (sortCol === 'signals') { va = (a.reasons || []).length; vb = (b.reasons || []).length; }
+    if (va === null || va === undefined) va = -Infinity;
+    if (vb === null || vb === undefined) vb = -Infinity;
+    if (typeof va === 'string') return sortDir === -1 ? vb.localeCompare(va) : va.localeCompare(vb);
+    return sortDir === -1 ? vb - va : va - vb;
+  });
+
+  const hiCount = sorted.filter(r => r.score >= 12).length;
+  document.getElementById('resultsCount').innerHTML = `<b>${sorted.length}</b> candidates &nbsp;·&nbsp; <span style="color:var(--pink)"><b>${hiCount}</b> highest apparent conviction</span> (score ≥12)`;
+
+  body.innerHTML = sorted.map(r => {
+    const priceTxt = r.close < 1 ? '$' + r.close.toFixed(4) : '$' + r.close.toFixed(2);
+    const runwayTxt = r.runwayQuarters === null || r.runwayQuarters === undefined ? '<span class="muted-cell">—</span>' : `${r.runwayQuarters.toFixed(2)}q`;
+    const shortTxt = r.shortPct === null || r.shortPct === undefined ? '<span class="muted-cell">—</span>' : `${r.shortPct.toFixed(1)}%${r.daysToCover ? ` (${r.daysToCover.toFixed(1)}d)` : ''}`;
+    const marginTxt = r.marginDeltaPts === null || r.marginDeltaPts === undefined ? '<span class="muted-cell">n/a</span>' : `${r.marginDeltaPts >= 0 ? '+' : ''}${r.marginDeltaPts.toFixed(1)}pts`;
+    const revTxt = r.revYoYPct === null || r.revYoYPct === undefined ? '<span class="muted-cell">n/a</span>' : `${r.revYoYPct >= 0 ? '+' : ''}${r.revYoYPct.toFixed(0)}%`;
+    const debtTxt = r.negativeEquity ? '<span style="color:var(--red);font-weight:700">NEG EQ</span>' : (r.debtEquity === null || r.debtEquity === undefined ? '<span class="muted-cell">n/a</span>' : `${r.debtEquity.toFixed(1)}x`);
+    const pills = (r.reasons || []).map(rs => `<span class="pill ${rs.cls}" title="${rs.points} pts">${rs.label}</span>`).join('');
+    return `<tr class="${r.score >= 12 ? 'hi-score' : ''}">
+      <td><a class="ticker-link" href="https://finance.yahoo.com/quote/${r.ticker}" target="_blank">${r.ticker}</a></td>
+      <td><span class="company-name">${r.company}</span></td>
+      <td><div class="pills">${pills || '<span class="muted-cell">—</span>'}</div></td>
+      <td><div class="score-wrap"><span>${r.score}</span><div class="score-bar"><div class="score-fill ${scoreClass(r.score)}" style="width:${Math.min(r.score*6,100)}%"></div></div></div></td>
+      <td>${runwayTxt}</td>
+      <td>${shortTxt}</td>
+      <td>${marginTxt}</td>
+      <td>${revTxt}</td>
+      <td>${debtTxt}</td>
+      <td>${priceTxt}</td>
+      <td>${r.shares.toLocaleString()}</td>
+      <td><button class="load-btn" onclick="loadIntoAIM('${r.ticker}',${r.close})">Short →</button></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('th[data-col]').forEach(th => {}); // no-op placeholder for symmetry
+  document.querySelectorAll('th[data-key]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.key === sortCol);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = th.dataset.key === sortCol ? (sortDir === -1 ? '↓' : '↑') : '↕';
+  });
+
+  section.style.display = 'block';
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+  renderResults();
+}
+document.querySelectorAll('#resultsTable thead th[data-key]').forEach(th => {
+  th.addEventListener('click', () => sortBy(th.dataset.key));
+});
+
+function finish() {
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+}
+function stopScreener() { aborted = true; hideProgress(); finish(); }
+
+function clearResults() {
+  allResults = [];
+  localStorage.removeItem(RESULTS_STORE);
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('lastScanTime').textContent = '';
+  hideError(); hideProgress();
+}
+
+// ============================================================
+// LOAD INTO AIM SHORT
+// ============================================================
+function loadIntoAIM(ticker, price) {
+  localStorage.setItem('aim_load', JSON.stringify({ ticker, price }));
+  window.open('index.html', '_blank');
+}
+
+// ============================================================
+// EXPORT CSV
+// ============================================================
+function exportCSV() {
+  if (!allResults.length) return;
+  const headers = ['Ticker', 'Company', 'Score', 'Signals', 'Runway (qtrs)', 'Short % Float', 'Days To Cover',
+                    'Margin Δ (pts)', 'Revenue Δ %', 'Debt/Equity', 'Negative Equity', 'Guidance Cut (text match)',
+                    'Price', 'Shares Outstanding', 'Has ATM', 'Has Offering', 'Offering Form', 'Offering Filed', 'CIK'];
+  const rows = allResults.map(r => [
+    r.ticker, `"${r.company}"`, r.score, `"${(r.reasons || []).map(x => x.label).join('; ')}"`,
+    r.runwayQuarters ?? '', r.shortPct !== null && r.shortPct !== undefined ? r.shortPct.toFixed(2) : '', r.daysToCover ?? '',
+    r.marginDeltaPts !== null && r.marginDeltaPts !== undefined ? r.marginDeltaPts.toFixed(2) : '',
+    r.revYoYPct !== null && r.revYoYPct !== undefined ? r.revYoYPct.toFixed(2) : '',
+    r.debtEquity !== null && r.debtEquity !== undefined ? r.debtEquity.toFixed(2) : '',
+    r.negativeEquity ? 'Yes' : 'No', r.guidanceCut ? 'Yes' : 'No',
+    r.close, r.shares, r.hasATM ? 'Yes' : 'No', r.hasOffering ? 'Yes' : 'No', r.offeringForm ?? '', r.offeringFileDate ?? '', r.cik ?? '',
+  ]);
+  const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `combined-short-screen-${todayISO()}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>

@@ -48,13 +48,17 @@ app.post('/api/portfolios', (req, res) => {
 // calls will fail there and the page says so.
 const SEC_USER_AGENT = 'AIM-Short-DilutionScreener mike@mikewenger.us';
 
-// SEC's endpoints occasionally return a transient 5xx under load; one quiet
-// retry smooths that over instead of surfacing it as a hard failure.
+// SEC's endpoints occasionally return a transient 5xx under load, and can
+// return 403/429 if a scan (especially the combined screener, which hits
+// EDGAR the hardest) is moving fast enough to look like abuse. Retry with
+// backoff on all three rather than surfacing a hard failure immediately.
 async function fetchSecWithRetry(url) {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const retryable = (status) => status >= 500 || status === 403 || status === 429;
+  const delays = [400, 1200, 3000];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
     const secRes = await fetch(url, { headers: { 'User-Agent': SEC_USER_AGENT } });
-    if (secRes.status < 500 || attempt === 1) return secRes;
-    await new Promise(r => setTimeout(r, 400));
+    if (!retryable(secRes.status) || attempt === delays.length) return secRes;
+    await new Promise(r => setTimeout(r, delays[attempt]));
   }
 }
 
