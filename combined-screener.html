@@ -87,6 +87,8 @@
   .results-count b { color: var(--text); }
 
   .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  .floating-hscroll { position: fixed; bottom: 0; left: 0; right: 0; overflow-x: auto; overflow-y: hidden; height: 16px; background: var(--surface); border-top: 1px solid var(--border); z-index: 60; display: none; }
+  .floating-hscroll-inner { height: 1px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1180px; }
   th { background: var(--surface2); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 8px 10px; text-align: right; white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none; z-index: 2; }
   th:hover { color: var(--text); }
@@ -328,6 +330,8 @@
   </div>
 
 </div>
+
+<div class="floating-hscroll" id="floatingHScroll"><div class="floating-hscroll-inner" id="floatingHScrollInner"></div></div>
 
 <script>
 // ============================================================
@@ -1004,6 +1008,7 @@ function renderResults() {
     body.innerHTML = '<tr><td colspan="15"><div style="text-align:center;padding:40px;color:var(--muted)">No candidates matched.</div></td></tr>';
     document.getElementById('resultsCount').innerHTML = '<b>0</b> candidates found';
     section.style.display = 'block';
+    updateFloatingScrollbar();
     return;
   }
 
@@ -1065,7 +1070,40 @@ function renderResults() {
   });
 
   section.style.display = 'block';
+  updateFloatingScrollbar();
 }
+
+// ── Floating horizontal scrollbar, synced to the results table ──
+// The results table can get wider than the viewport; without this its
+// native scrollbar sits at the bottom of a possibly very tall table,
+// forcing a full page scroll just to reach it.
+function updateFloatingScrollbar() {
+  const tableWrap = document.querySelector('.table-wrap');
+  const floatBar = document.getElementById('floatingHScroll');
+  const floatInner = document.getElementById('floatingHScrollInner');
+  if (!tableWrap || !floatBar || tableWrap.offsetParent === null) { if (floatBar) floatBar.style.display = 'none'; return; }
+  floatInner.style.width = tableWrap.scrollWidth + 'px';
+  floatBar.style.display = tableWrap.scrollWidth > tableWrap.clientWidth + 1 ? 'block' : 'none';
+}
+(function setupFloatingScrollbarSync() {
+  const tableWrap = document.querySelector('.table-wrap');
+  const floatBar = document.getElementById('floatingHScroll');
+  if (!tableWrap || !floatBar) return;
+  let syncing = false;
+  tableWrap.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    floatBar.scrollLeft = tableWrap.scrollLeft;
+    syncing = false;
+  });
+  floatBar.addEventListener('scroll', () => {
+    if (syncing) return;
+    syncing = true;
+    tableWrap.scrollLeft = floatBar.scrollLeft;
+    syncing = false;
+  });
+  window.addEventListener('resize', updateFloatingScrollbar);
+})();
 
 function sortBy(col) {
   if (sortCol === col) sortDir *= -1;
