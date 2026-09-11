@@ -180,7 +180,7 @@
       </div>
       <div class="field">
         <label>Strike Selection</label>
-        <input type="text" value="ATM (nearest strike to underlying at entry)" readonly style="color:var(--muted)">
+        <input type="text" value="1 strike OTM (nearest listed strike beyond the money at entry)" readonly style="color:var(--muted)">
       </div>
     </div>
 
@@ -441,14 +441,24 @@ async function findNearestContract(ticker, expirationDate, contractType, targetP
     pages++;
   }
   if (!all.length) return { ok: false, contract: null, error: `Massive returned zero ${contractType} contracts for ${ticker} expiring ${expirationDate}` };
+  // 1 strike out-of-the-money: for calls, the nearest listed strike ABOVE the
+  // underlying; for puts, the nearest listed strike BELOW it. Never picks ATM
+  // or ITM — only real, listed strikes are considered.
   let best = null, bestDiff = Infinity;
   for (const c of all) {
     const strike = c.strike_price;
     if (strike == null || !c.ticker) continue;
-    const diff = Math.abs(strike - targetPrice);
-    if (diff < bestDiff) { bestDiff = diff; best = c; }
+    if (contractType === 'call') {
+      if (strike <= targetPrice) continue;
+      const diff = strike - targetPrice;
+      if (diff < bestDiff) { bestDiff = diff; best = c; }
+    } else {
+      if (strike >= targetPrice) continue;
+      const diff = targetPrice - strike;
+      if (diff < bestDiff) { bestDiff = diff; best = c; }
+    }
   }
-  if (!best) return { ok: false, contract: null, error: `contracts returned but none had usable strike/ticker fields` };
+  if (!best) return { ok: false, contract: null, error: `no strictly out-of-the-money ${contractType} strike found relative to $${targetPrice.toFixed(2)} (underlying may be at the top/bottom of the listed chain)` };
   return { ok: true, contract: best, error: null };
 }
 
@@ -620,16 +630,16 @@ function stopWithError(msg) {
   showError(msg);
 }
 
-// Finds the ATM contract, fetches its intraday prices, simulates the trade.
+// Finds the 1-strike-OTM contract, fetches its intraday prices, simulates the trade.
 // Returns { stop, error, trade } — stop=true means the whole backtest must halt.
 async function executeLeg(leg, contractType, ticker, dateStr, underlyingPrice, entryTimeMs, sessionEndMs, contracts, target, signalBarMs, prevRsi, curRsi) {
-  showProgress(`Looking up ATM ${contractType} contract for ${ticker} @ ~$${underlyingPrice.toFixed(2)}...`);
+  showProgress(`Looking up 1-OTM ${contractType} contract for ${ticker} @ ~$${underlyingPrice.toFixed(2)}...`);
   const cRes = await findNearestContract(ticker, dateStr, contractType, underlyingPrice);
   if (!cRes.ok) {
     return { stop: true, error: `Options contract lookup failed for the ${leg} leg: ${cRes.error}. Massive does not appear to provide 0DTE options data for this request — stopping rather than simulating a price.` };
   }
   const contract = cRes.contract;
-  addLog(`  → ATM contract: ${contract.ticker} (strike $${contract.strike_price})`);
+  addLog(`  → 1-OTM contract: ${contract.ticker} (strike $${contract.strike_price})`);
 
   showProgress(`Fetching intraday prices for ${contract.ticker}...`);
   const pxRes = await fetchOptionIntraday(contract.ticker, dateStr);
