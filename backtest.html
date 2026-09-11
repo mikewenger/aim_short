@@ -566,6 +566,7 @@ async function runBacktest() {
       windowIdx.push(i);
     }
     if (!windowIdx.length) { stopWithError(`No ${barMult}-${barSpan} bars fell inside ${document.getElementById('sessStart').value}–${document.getElementById('sessEnd').value} ET on ${dateStr} with enough RSI history (market holiday/weekend, or insufficient lookback). Nothing to backtest.`); return; }
+    const windowSet = new Set(windowIdx);
     addLog(`${windowIdx.length} signal bars in session window on ${dateStr}.`);
 
     const sessionEndMs = (() => {
@@ -582,16 +583,34 @@ async function runBacktest() {
     const barDurMs = timespanMs(barMultN, barSpan);
     const trades = [];
     let lastLongExitMs = -Infinity, lastShortExitMs = -Infinity;
+    // "Armed" once RSI crosses the threshold; fires (and disarms) on the first
+    // bar-over-bar reversal seen while armed, so one overbought/oversold
+    // excursion produces exactly one signal — not one per down/up-tick of a
+    // multi-bar decline/rally. Walked over the FULL series (not just the
+    // session window) so a peak that formed just before the open still
+    // confirms correctly on the first in-session bar.
+    let armedLong = false, armedShort = false;
 
-    // ── STEP 4: walk the window, fire + simulate trades in order ──
-    for (const i of windowIdx) {
+    // ── STEP 4: walk the full series, fire + simulate trades in session order ──
+    for (let i = 1; i < bars.length; i++) {
       if (aborted) { addLog('Stopped by user.', 'warn'); break; }
       const prevRsi = rsiSeries[i - 1], curRsi = rsiSeries[i];
+      if (prevRsi == null || curRsi == null) continue;
+
+      if (curRsi > obThreshold) armedLong = true;
+      if (curRsi < osThreshold) armedShort = true;
+      const longFire = armedLong && curRsi < prevRsi;
+      const shortFire = armedShort && curRsi > prevRsi;
+      if (longFire) armedLong = false;
+      if (shortFire) armedShort = false;
+
+      if (!windowSet.has(i)) continue; // only trade signals inside the session window on the target date
+
       const signalCloseMs = timestamps[i] + barDurMs;
       if (signalCloseMs >= sessionEndMs) continue; // no time left to trade
 
-      const longSignal = prevRsi > obThreshold && curRsi < prevRsi && signalCloseMs >= lastLongExitMs;
-      const shortSignal = prevRsi < osThreshold && curRsi > prevRsi && signalCloseMs >= lastShortExitMs;
+      const longSignal = longFire && signalCloseMs >= lastLongExitMs;
+      const shortSignal = shortFire && signalCloseMs >= lastShortExitMs;
 
       if (longSignal) {
         addLog(`LONG signal at ${fmtET(timestamps[i])} ET — RSI ${prevRsi.toFixed(1)} → ${curRsi.toFixed(1)} (confirmed reversal down from overbought)`);
