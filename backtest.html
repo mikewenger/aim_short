@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIM 0DTE Backtest</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3350; --text: #e2e8f0; --muted: #8892b0;
+    --green: #10b981; --red: #ef4444; --blue: #3b82f6;
+    --yellow: #f59e0b; --purple: #8b5cf6; --pink: #ec4899; --orange: #f97316;
+    --green-dim: #064e3b; --red-dim: #450a0a; --blue-dim: #1e3a8a;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header h1 span { color: var(--purple); }
+  header .subtitle { color: var(--muted); font-size: 12px; }
+  .badge { background: var(--blue-dim); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: auto; }
+  .back-link { color: var(--muted); font-size: 12px; text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 5px; }
+  .back-link:hover { color: var(--text); border-color: var(--blue); }
+
+  .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--blue); }
+  .field .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .field .hint a { color: var(--muted); text-decoration: underline; }
+
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+  .leg-block { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .leg-block.long { border-left: 3px solid var(--green); }
+  .leg-block.short { border-left: 3px solid var(--red); }
+  .leg-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .leg-title.long { color: var(--green); }
+  .leg-title.short { color: var(--red); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: var(--purple); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #7c3aed; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--blue); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; white-space: pre-wrap; }
+  .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert-legal { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow); display: block; line-height: 1.6; }
+
+  .progress-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; display: none; }
+  .progress-label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+
+  .scan-log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; display: none; max-height: 220px; overflow-y: auto; }
+  .scan-log-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+  .log-entry { font-size: 12px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { font-family: monospace; white-space: nowrap; color: var(--muted); }
+  .log-msg { color: var(--text); }
+  .log-warn { color: var(--yellow); }
+  .log-err { color: var(--red); }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-tile { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .stat-tile .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 4px; }
+  .stat-tile .stat-value { font-size: 20px; font-weight: 700; }
+  .stat-value.pos { color: var(--green); }
+  .stat-value.neg { color: var(--red); }
+
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px; }
+  th { background: var(--surface2); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 8px 10px; text-align: right; white-space: nowrap; }
+  th:first-child, th:nth-child(2), th:nth-child(3) { text-align: left; }
+  td { padding: 8px 10px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+  td:first-child, td:nth-child(2), td:nth-child(3) { text-align: left; }
+  tr:hover td { background: var(--surface2); }
+
+  .pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+  .pill-long { background: rgba(16,185,129,0.18); color: var(--green); }
+  .pill-short { background: rgba(239,68,68,0.18); color: var(--red); }
+  .pill-hit { background: rgba(16,185,129,0.18); color: var(--green); }
+  .pill-eod { background: rgba(148,163,184,0.18); color: #cbd5e1; }
+
+  .methodology { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 4px; }
+  .method-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .method-card ul { padding-left: 18px; font-size: 11.5px; color: var(--muted); }
+  .method-card li { margin-bottom: 4px; }
+  .method-card li b { color: var(--text); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AIM <span>0DTE Backtest</span></h1>
+    <div class="subtitle">RSI-reversal same-day options backtest · real Massive fills only, no simulated pricing</div>
+  </div>
+  <a href="index.html" class="back-link">← AIM Short</a>
+  <a href="screener.html" class="back-link">Long Screener</a>
+  <a href="dilution-screener.html" class="back-link">Dilution Screener</a>
+  <a href="offerings-screener.html" class="back-link">Offerings Scanner</a>
+  <a href="combined-screener.html" class="back-link">Combined Screener</a>
+  <span class="badge">v1.0</span>
+</header>
+
+<div class="page">
+
+  <div class="alert alert-legal">
+    <b>What this does and doesn't do:</b> every fill in this backtest comes from Massive's real historical bars for the underlying and for the specific 0DTE option contract traded — nothing here is simulated or estimated. If Massive doesn't return real options data for a step (contract listing or intraday pricing), the run stops immediately and tells you exactly which call failed, instead of guessing a price. This is a historical simulation, not investment advice, and past signals don't guarantee future fills at these prices (real-world slippage/spread aren't modeled beyond the actual quoted bar prices returned).
+  </div>
+
+  <!-- CONFIG -->
+  <div class="card">
+    <div class="card-title">Configuration</div>
+    <div class="grid-2" style="margin-bottom:14px">
+      <div class="field">
+        <label>Massive API Key</label>
+        <input type="password" id="apiKey" placeholder="Enter your Massive API key..." oninput="saveApiKey()">
+        <div class="hint">Shared with the other AIM Short pages — saved only in this browser's local storage. <a href="#" onclick="forgetApiKey(); return false">Forget key</a></div>
+      </div>
+      <div class="field">
+        <label>Underlying Ticker</label>
+        <input type="text" id="ticker" value="SPY" style="text-transform:uppercase">
+        <div class="hint">Must have same-day (0DTE) listed options on the backtest date</div>
+      </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:6px">
+      <div class="field">
+        <label>Backtest Date</label>
+        <input type="date" id="btDate" value="2026-09-11">
+      </div>
+      <div class="field">
+        <label>Signal Timeframe</label>
+        <select id="barTimespan">
+          <option value="15|minute">15 Minute</option>
+          <option value="30|minute">30 Minute</option>
+          <option value="1|hour" selected>1 Hour</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Session Start (ET)</label>
+        <input type="time" id="sessStart" value="09:30" step="1">
+      </div>
+      <div class="field">
+        <label>Session End (ET)</label>
+        <input type="time" id="sessEnd" value="16:00" step="1">
+      </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:16px">
+      <div class="field">
+        <label>RSI Period</label>
+        <input type="number" id="rsiPeriod" value="14" min="2" max="50">
+      </div>
+      <div class="field">
+        <label>Overbought Threshold</label>
+        <input type="number" id="obThreshold" value="70" min="50" max="99">
+      </div>
+      <div class="field">
+        <label>Oversold Threshold</label>
+        <input type="number" id="osThreshold" value="30" min="1" max="50">
+      </div>
+      <div class="field">
+        <label>Strike Selection</label>
+        <input type="text" value="ATM (nearest strike to underlying at entry)" readonly style="color:var(--muted)">
+      </div>
+    </div>
+
+    <div class="leg-block long">
+      <div class="leg-title long">📈 Long Leg — Buy Calls</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Contracts</label>
+          <input type="number" id="longContracts" value="30" min="1">
+        </div>
+        <div class="field">
+          <label>Profit Target ($, total position)</label>
+          <input type="number" id="longTarget" value="500" min="1" step="10">
+        </div>
+      </div>
+      <div class="hint">Entry: RSI confirms a reversal down from a peak above the overbought threshold → buy calls at the open of the next available tick.</div>
+    </div>
+
+    <div class="leg-block short">
+      <div class="leg-title short">📉 Short Leg — Buy Puts</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Contracts</label>
+          <input type="number" id="shortContracts" value="30" min="1">
+        </div>
+        <div class="field">
+          <label>Profit Target ($, total position)</label>
+          <input type="number" id="shortTarget" value="500" min="1" step="10">
+        </div>
+      </div>
+      <div class="hint">Entry: RSI confirms a reversal up from a trough below the oversold threshold → buy puts at the open of the next available tick.</div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-primary" id="runBtn" onclick="runBacktest()">▶ Run Backtest</button>
+      <button class="btn btn-danger btn-sm" id="stopBtn" onclick="stopBacktest()" style="display:none">■ Stop</button>
+      <button class="btn btn-secondary btn-sm" onclick="clearResults()">Clear</button>
+    </div>
+
+    <div class="methodology">
+      <div class="method-card">
+        <div class="card-title" style="margin-bottom:8px">Signal Logic</div>
+        <ul>
+          <li>RSI(period) computed with <b>Wilder smoothing</b> over the full history window (not just the backtest day), so the very first in-session bar has a real warmed-up value</li>
+          <li>"Peak over threshold, confirmed reversal" = the first bar-over-bar <b>decrease</b> in RSI immediately following any bar where RSI was above the overbought threshold</li>
+          <li>Symmetric rule for troughs: first bar-over-bar <b>increase</b> following any bar below the oversold threshold</li>
+          <li>Each leg re-arms after its position closes — a leg can trade more than once in a session if RSI oscillates again</li>
+        </ul>
+      </div>
+      <div class="method-card">
+        <div class="card-title" style="margin-bottom:8px">Fill &amp; P&amp;L Logic</div>
+        <ul>
+          <li>Entry price = <b>real</b> option price at the open of the first available tick at/after the signal bar closes</li>
+          <li>Intra-trade P&amp;L is marked from real option aggregate bars — <b>1-second bars if Massive returns them, otherwise 1-minute</b> (whichever was actually used is logged per trade)</li>
+          <li>Position exits the instant marked P&amp;L reaches the profit target, or is force-closed at session end (0DTE) if the target is never hit — in that case the <b>maximum P&amp;L reached intraday</b> is reported alongside the actual (smaller) realized result</li>
+          <li>If Massive can't supply real contract or price data at any step, the run <b>stops and reports the exact failure</b> instead of guessing</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="alert alert-error" id="errorAlert"></div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">Initializing...</div>
+  </div>
+
+  <!-- LOG -->
+  <div class="scan-log" id="scanLog">
+    <div class="scan-log-title">Backtest Log</div>
+    <div id="scanLogEntries"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" style="display:none">
+    <div class="card">
+      <div class="card-title">Summary</div>
+      <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Trades</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Leg</th>
+              <th>Contract</th>
+              <th>Signal Bar</th>
+              <th>RSI (prev → signal)</th>
+              <th>Entry Time (ET)</th>
+              <th>Entry Price</th>
+              <th>Exit Time (ET)</th>
+              <th>Exit Price</th>
+              <th>Result</th>
+              <th>Realized P&amp;L</th>
+              <th>Max P&amp;L Reached</th>
+              <th>Max P&amp;L Time (ET)</th>
+              <th>Fill Granularity</th>
+            </tr>
+          </thead>
+          <tbody id="tradesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS / STATE
+// ============================================================
+const BASE = 'https://api.massive.com';
+const API_KEY_STORE = 'aim_massive_api_key';
+let aborted = false;
+
+// ============================================================
+// API KEY PERSISTENCE (shared across all AIM Short pages)
+// ============================================================
+function saveApiKey() {
+  const val = document.getElementById('apiKey').value.trim();
+  if (val) localStorage.setItem(API_KEY_STORE, val);
+  else localStorage.removeItem(API_KEY_STORE);
+}
+function forgetApiKey() {
+  localStorage.removeItem(API_KEY_STORE);
+  document.getElementById('apiKey').value = '';
+}
+(function loadSavedApiKey() {
+  const saved = localStorage.getItem(API_KEY_STORE);
+  if (saved) document.getElementById('apiKey').value = saved;
+})();
+
+// ============================================================
+// API HELPERS
+// ============================================================
+function apiHeaders() {
+  return { 'Authorization': `Bearer ${document.getElementById('apiKey').value.trim()}` };
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Returns { ok, status, data, error } — never throws, so callers can decide to stop cleanly.
+async function fetchMassive(url) {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const sep = url.includes('?') ? '&' : '?';
+  const fullUrl = url + sep + 'apiKey=' + encodeURIComponent(apiKey);
+  let res;
+  try {
+    res = await fetch(fullUrl, { headers: apiHeaders() });
+  } catch (e) {
+    return { ok: false, status: 0, data: null, error: `Network/CORS error calling Massive (${e.message})` };
+  }
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* non-JSON body */ }
+  if (!res.ok) return { ok: false, status: res.status, data, error: `HTTP ${res.status} ${res.statusText}` };
+  return { ok: true, status: res.status, data, error: null };
+}
+
+// ============================================================
+// TIME HELPERS (America/New_York, DST-safe via Intl)
+// ============================================================
+const ET_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York', hour12: false,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit'
+});
+function etParts(ms) {
+  const parts = Object.fromEntries(ET_FMT.formatToParts(new Date(ms)).map(p => [p.type, p.value]));
+  return { y: +parts.year, mo: +parts.month, d: +parts.day, h: +parts.hour, mi: +parts.minute, s: +parts.second };
+}
+function etDateStr(ms) { const p = etParts(ms); return `${p.y}-${String(p.mo).padStart(2,'0')}-${String(p.d).padStart(2,'0')}`; }
+function etMinutesOfDay(ms) { const p = etParts(ms); return p.h * 60 + p.mi + p.s / 60; }
+function fmtET(ms) { const p = etParts(ms); return `${String(p.h).padStart(2,'0')}:${String(p.mi).padStart(2,'0')}:${String(p.s).padStart(2,'0')}`; }
+function timeInputToMinutes(str) { const [h, m] = str.split(':').map(Number); return h * 60 + m; }
+function isoDateMinus(dateStr, days) {
+  const d = new Date(dateStr + 'T12:00:00Z'); // noon UTC avoids DST edge issues
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+function timespanMs(mult, timespan) {
+  const unit = { minute: 60000, hour: 3600000, day: 86400000, second: 1000 }[timespan];
+  return mult * unit;
+}
+
+// ============================================================
+// RSI — Wilder smoothing, full series (not just latest value)
+// ============================================================
+function computeRSISeries(closes, period = 14) {
+  const out = new Array(closes.length).fill(null);
+  if (closes.length < period + 1) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const delta = closes[i] - closes[i - 1];
+    if (delta >= 0) gains += delta; else losses -= delta;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < closes.length; i++) {
+    const delta = closes[i] - closes[i - 1];
+    const gain = delta > 0 ? delta : 0;
+    const loss = delta < 0 ? -delta : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return out;
+}
+
+// ============================================================
+// LOGGING / PROGRESS / ERROR UI
+// ============================================================
+function addLog(msg, level = '') {
+  const el = document.getElementById('scanLog');
+  el.style.display = 'block';
+  const entries = document.getElementById('scanLogEntries');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span><span class="log-msg ${level === 'warn' ? 'log-warn' : level === 'err' ? 'log-err' : ''}">${msg}</span>`;
+  entries.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+function showProgress(label) {
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressLabel').textContent = label;
+}
+function hideProgress() { document.getElementById('progressWrap').style.display = 'none'; }
+function showError(msg) {
+  const el = document.getElementById('errorAlert');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideError() { document.getElementById('errorAlert').style.display = 'none'; }
+function clearResults() {
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('scanLog').style.display = 'none';
+  document.getElementById('scanLogEntries').innerHTML = '';
+  hideError();
+}
+function stopBacktest() { aborted = true; }
+
+// ============================================================
+// OPTIONS CONTRACT LOOKUP
+// ============================================================
+// Fetches the full 0DTE chain for one side (call/put) and returns the contract
+// whose strike is nearest to targetPrice. Returns { ok, contract, error }.
+async function findNearestContract(ticker, expirationDate, contractType, targetPrice) {
+  let url = `${BASE}/v3/reference/options/contracts?underlying_ticker=${encodeURIComponent(ticker)}&contract_type=${contractType}&expiration_date=${expirationDate}&as_of=${expirationDate}&limit=1000`;
+  let all = [];
+  let pages = 0;
+  while (url && pages < 5) {
+    const r = await fetchMassive(url);
+    if (!r.ok) return { ok: false, contract: null, error: `contracts lookup failed (${r.error})` };
+    const results = (r.data && r.data.results) || [];
+    all = all.concat(results);
+    url = (r.data && r.data.next_url) || null;
+    pages++;
+  }
+  if (!all.length) return { ok: false, contract: null, error: `Massive returned zero ${contractType} contracts for ${ticker} expiring ${expirationDate}` };
+  let best = null, bestDiff = Infinity;
+  for (const c of all) {
+    const strike = c.strike_price;
+    if (strike == null || !c.ticker) continue;
+    const diff = Math.abs(strike - targetPrice);
+    if (diff < bestDiff) { bestDiff = diff; best = c; }
+  }
+  if (!best) return { ok: false, contract: null, error: `contracts returned but none had usable strike/ticker fields` };
+  return { ok: true, contract: best, error: null };
+}
+
+// Tries 1-second bars first, falls back to 1-minute. Returns { ok, bars, granularity, error }.
+async function fetchOptionIntraday(contractTicker, dateStr) {
+  for (const [mult, span] of [[1, 'second'], [1, 'minute']]) {
+    const url = `${BASE}/v2/aggs/ticker/${encodeURIComponent(contractTicker)}/range/${mult}/${span}/${dateStr}/${dateStr}?adjusted=true&sort=asc&limit=50000`;
+    const r = await fetchMassive(url);
+    if (r.ok && r.data && Array.isArray(r.data.results) && r.data.results.length) {
+      return { ok: true, bars: r.data.results, granularity: span, error: null };
+    }
+    if (!r.ok) addLog(`  ${span}-level fetch for ${contractTicker} failed: ${r.error} — trying next granularity if available`, 'warn');
+  }
+  return { ok: false, bars: null, granularity: null, error: `no 1-second or 1-minute price data returned for ${contractTicker} on ${dateStr}` };
+}
+
+// ============================================================
+// TRADE SIMULATION FOR ONE ENTRY
+// ============================================================
+// bars: option intraday bars (t = start ms, o/h/l/c). entryTimeMs: earliest
+// eligible fill time. sessionEndMs: forced-close deadline.
+function simulateTrade(bars, entryTimeMs, sessionEndMs, contracts, target) {
+  const inWindow = bars.filter(b => b.t >= entryTimeMs && b.t <= sessionEndMs);
+  if (!inWindow.length) return { ok: false, error: 'no option ticks at/after the entry time within the session' };
+
+  const entryPrice = inWindow[0].o != null ? inWindow[0].o : inWindow[0].c;
+  let maxPnl = -Infinity, maxPnlTime = inWindow[0].t;
+  let targetHit = false, exitPrice = null, exitTime = null;
+
+  for (const b of inWindow) {
+    const markPrice = b.c;
+    const pnl = (markPrice - entryPrice) * 100 * contracts;
+    if (pnl > maxPnl) { maxPnl = pnl; maxPnlTime = b.t; }
+    if (pnl >= target) {
+      targetHit = true;
+      exitPrice = markPrice;
+      exitTime = b.t;
+      break;
+    }
+  }
+  if (!targetHit) {
+    const last = inWindow[inWindow.length - 1];
+    exitPrice = last.c;
+    exitTime = last.t;
+  }
+  const realizedPnl = (exitPrice - entryPrice) * 100 * contracts;
+  return { ok: true, entryPrice, exitPrice, exitTime, targetHit, realizedPnl, maxPnl, maxPnlTime };
+}
+
+// ============================================================
+// MAIN BACKTEST RUN
+// ============================================================
+async function runBacktest() {
+  aborted = false;
+  hideError();
+  clearResults();
+  document.getElementById('scanLog').style.display = 'block';
+
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showError('Please enter your Massive API key.'); return; }
+
+  const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+  const dateStr = document.getElementById('btDate').value;
+  const [barMult, barSpan] = document.getElementById('barTimespan').value.split('|');
+  const barMultN = parseInt(barMult, 10);
+  const rsiPeriod = parseInt(document.getElementById('rsiPeriod').value, 10);
+  const obThreshold = parseFloat(document.getElementById('obThreshold').value);
+  const osThreshold = parseFloat(document.getElementById('osThreshold').value);
+  const sessStartMin = timeInputToMinutes(document.getElementById('sessStart').value);
+  const sessEndMin = timeInputToMinutes(document.getElementById('sessEnd').value);
+  const longContracts = parseInt(document.getElementById('longContracts').value, 10);
+  const longTarget = parseFloat(document.getElementById('longTarget').value);
+  const shortContracts = parseInt(document.getElementById('shortContracts').value, 10);
+  const shortTarget = parseFloat(document.getElementById('shortTarget').value);
+
+  if (!dateStr) { showError('Pick a backtest date.'); return; }
+
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = 'inline-flex';
+
+  try {
+    // ── STEP 1: underlying history for RSI warm-up ──────────
+    const lookbackStart = isoDateMinus(dateStr, 30);
+    showProgress(`Fetching ${ticker} ${barMult}-${barSpan} bars, ${lookbackStart} → ${dateStr}...`);
+    addLog(`Fetching underlying bars: ${ticker} ${barMult}/${barSpan} from ${lookbackStart} to ${dateStr}`);
+    const aggUrl = `${BASE}/v2/aggs/ticker/${ticker}/range/${barMult}/${barSpan}/${lookbackStart}/${dateStr}?adjusted=true&sort=asc&limit=5000`;
+    const aggRes = await fetchMassive(aggUrl);
+    if (!aggRes.ok) { stopWithError(`Massive rejected the underlying price request for ${ticker} (${aggRes.error}). Cannot proceed without real price bars.`); return; }
+    const bars = (aggRes.data && aggRes.data.results) || [];
+    if (!bars.length) { stopWithError(`Massive returned zero ${ticker} bars between ${lookbackStart} and ${dateStr}. Check the ticker/date or your API plan's history depth.`); return; }
+    addLog(`Got ${bars.length} underlying bars.`);
+
+    // ── STEP 2: RSI series ───────────────────────────────────
+    const closes = bars.map(b => b.c);
+    const timestamps = bars.map(b => b.t);
+    const rsiSeries = computeRSISeries(closes, rsiPeriod);
+
+    // ── STEP 3: restrict to the session window on the target date ──
+    const windowIdx = [];
+    for (let i = 1; i < bars.length; i++) {
+      if (etDateStr(timestamps[i]) !== dateStr) continue;
+      const mins = etMinutesOfDay(timestamps[i]);
+      if (mins < sessStartMin || mins >= sessEndMin) continue;
+      if (rsiSeries[i - 1] == null || rsiSeries[i] == null) continue;
+      windowIdx.push(i);
+    }
+    if (!windowIdx.length) { stopWithError(`No ${barMult}-${barSpan} bars fell inside ${document.getElementById('sessStart').value}–${document.getElementById('sessEnd').value} ET on ${dateStr} with enough RSI history (market holiday/weekend, or insufficient lookback). Nothing to backtest.`); return; }
+    addLog(`${windowIdx.length} signal bars in session window on ${dateStr}.`);
+
+    const sessionEndMs = (() => {
+      // find/construct session-end instant in ET for the target date, in ms
+      const anchor = timestamps.find(t => etDateStr(t) === dateStr);
+      const p = etParts(anchor);
+      // Build a UTC guess then correct using the offset implied by etParts vs actual ms of an in-day bar.
+      const dayBar = timestamps.find(t => etDateStr(t) === dateStr);
+      const offsetMs = dayBar - Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s);
+      const endH = Math.floor(sessEndMin / 60), endM = sessEndMin % 60;
+      return Date.UTC(p.y, p.mo - 1, p.d, endH, endM, 0) + offsetMs;
+    })();
+
+    const barDurMs = timespanMs(barMultN, barSpan);
+    const trades = [];
+    let lastLongExitMs = -Infinity, lastShortExitMs = -Infinity;
+
+    // ── STEP 4: walk the window, fire + simulate trades in order ──
+    for (const i of windowIdx) {
+      if (aborted) { addLog('Stopped by user.', 'warn'); break; }
+      const prevRsi = rsiSeries[i - 1], curRsi = rsiSeries[i];
+      const signalCloseMs = timestamps[i] + barDurMs;
+      if (signalCloseMs >= sessionEndMs) continue; // no time left to trade
+
+      const longSignal = prevRsi > obThreshold && curRsi < prevRsi && signalCloseMs >= lastLongExitMs;
+      const shortSignal = prevRsi < osThreshold && curRsi > prevRsi && signalCloseMs >= lastShortExitMs;
+
+      if (longSignal) {
+        addLog(`LONG signal at ${fmtET(timestamps[i])} ET — RSI ${prevRsi.toFixed(1)} → ${curRsi.toFixed(1)} (confirmed reversal down from overbought)`);
+        const res = await executeLeg('long', 'call', ticker, dateStr, closes[i], signalCloseMs, sessionEndMs, longContracts, longTarget, timestamps[i], prevRsi, curRsi);
+        if (res.stop) { stopWithError(res.error); return; }
+        if (res.trade) { trades.push(res.trade); lastLongExitMs = res.trade.exitTimeMs; renderTradesTable(trades); }
+      }
+      if (shortSignal) {
+        addLog(`SHORT signal at ${fmtET(timestamps[i])} ET — RSI ${prevRsi.toFixed(1)} → ${curRsi.toFixed(1)} (confirmed reversal up from oversold)`);
+        const res = await executeLeg('short', 'put', ticker, dateStr, closes[i], signalCloseMs, sessionEndMs, shortContracts, shortTarget, timestamps[i], prevRsi, curRsi);
+        if (res.stop) { stopWithError(res.error); return; }
+        if (res.trade) { trades.push(res.trade); lastShortExitMs = res.trade.exitTimeMs; renderTradesTable(trades); }
+      }
+    }
+
+    hideProgress();
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('stopBtn').style.display = 'none';
+
+    if (!trades.length) {
+      addLog('No qualifying RSI reversal signals occurred in the session window — no trades to report.', 'warn');
+    }
+    renderSummary(trades);
+    document.getElementById('resultsSection').style.display = 'block';
+
+  } catch (e) {
+    stopWithError(`Unexpected error: ${e.message}`);
+  }
+}
+
+function stopWithError(msg) {
+  hideProgress();
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  addLog(msg, 'err');
+  showError(msg);
+}
+
+// Finds the ATM contract, fetches its intraday prices, simulates the trade.
+// Returns { stop, error, trade } — stop=true means the whole backtest must halt.
+async function executeLeg(leg, contractType, ticker, dateStr, underlyingPrice, entryTimeMs, sessionEndMs, contracts, target, signalBarMs, prevRsi, curRsi) {
+  showProgress(`Looking up ATM ${contractType} contract for ${ticker} @ ~$${underlyingPrice.toFixed(2)}...`);
+  const cRes = await findNearestContract(ticker, dateStr, contractType, underlyingPrice);
+  if (!cRes.ok) {
+    return { stop: true, error: `Options contract lookup failed for the ${leg} leg: ${cRes.error}. Massive does not appear to provide 0DTE options data for this request — stopping rather than simulating a price.` };
+  }
+  const contract = cRes.contract;
+  addLog(`  → ATM contract: ${contract.ticker} (strike $${contract.strike_price})`);
+
+  showProgress(`Fetching intraday prices for ${contract.ticker}...`);
+  const pxRes = await fetchOptionIntraday(contract.ticker, dateStr);
+  if (!pxRes.ok) {
+    return { stop: true, error: `No real intraday price data for ${contract.ticker} on ${dateStr}: ${pxRes.error}. Stopping rather than simulating fills.` };
+  }
+  addLog(`  → ${pxRes.bars.length} ${pxRes.granularity}-level bars for ${contract.ticker}`);
+
+  const sim = simulateTrade(pxRes.bars, entryTimeMs, sessionEndMs, contracts, target);
+  if (!sim.ok) {
+    return { stop: true, error: `${contract.ticker}: ${sim.error}. Stopping rather than fabricating a fill.` };
+  }
+
+  addLog(`  → entry $${sim.entryPrice.toFixed(2)} at ${fmtET(entryTimeMs)} ET, exit $${sim.exitPrice.toFixed(2)} at ${fmtET(sim.exitTime)} ET, realized $${sim.realizedPnl.toFixed(0)}${sim.targetHit ? ' (target hit)' : ' (EOD close, target not reached — max $' + sim.maxPnl.toFixed(0) + ' reached at ' + fmtET(sim.maxPnlTime) + ' ET)'}`);
+
+  return {
+    stop: false,
+    trade: {
+      leg, contractTicker: contract.ticker, strike: contract.strike_price, contractType,
+      signalBarMs, prevRsi, curRsi,
+      entryTimeMs, entryPrice: sim.entryPrice,
+      exitTimeMs: sim.exitTime, exitPrice: sim.exitPrice,
+      targetHit: sim.targetHit, realizedPnl: sim.realizedPnl,
+      maxPnl: sim.maxPnl, maxPnlTime: sim.maxPnlTime,
+      granularity: pxRes.granularity,
+    }
+  };
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderTradesTable(trades) {
+  const tbody = document.getElementById('tradesBody');
+  tbody.innerHTML = trades.map(t => `
+    <tr>
+      <td><span class="pill ${t.leg === 'long' ? 'pill-long' : 'pill-short'}">${t.leg === 'long' ? '📈 Long' : '📉 Short'}</span></td>
+      <td>${t.contractTicker}<div style="font-size:10px;color:var(--muted)">strike $${t.strike}</div></td>
+      <td>${fmtET(t.signalBarMs)} ET</td>
+      <td>${t.prevRsi.toFixed(1)} → ${t.curRsi.toFixed(1)}</td>
+      <td>${fmtET(t.entryTimeMs)} ET</td>
+      <td>$${t.entryPrice.toFixed(2)}</td>
+      <td>${fmtET(t.exitTimeMs)} ET</td>
+      <td>$${t.exitPrice.toFixed(2)}</td>
+      <td><span class="pill ${t.targetHit ? 'pill-hit' : 'pill-eod'}">${t.targetHit ? 'Target Hit' : 'EOD Close'}</span></td>
+      <td style="color:${t.realizedPnl >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700">$${t.realizedPnl.toFixed(0)}</td>
+      <td>$${t.maxPnl.toFixed(0)}</td>
+      <td>${fmtET(t.maxPnlTime)} ET</td>
+      <td>${t.granularity}</td>
+    </tr>
+  `).join('');
+  document.getElementById('resultsSection').style.display = 'block';
+}
+
+function renderSummary(trades) {
+  const grid = document.getElementById('summaryGrid');
+  const totalPnl = trades.reduce((s, t) => s + t.realizedPnl, 0);
+  const wins = trades.filter(t => t.realizedPnl > 0).length;
+  const targetsHit = trades.filter(t => t.targetHit).length;
+  const longTrades = trades.filter(t => t.leg === 'long');
+  const shortTrades = trades.filter(t => t.leg === 'short');
+  const longPnl = longTrades.reduce((s, t) => s + t.realizedPnl, 0);
+  const shortPnl = shortTrades.reduce((s, t) => s + t.realizedPnl, 0);
+
+  const tile = (label, value, cls = '') => `
+    <div class="stat-tile">
+      <div class="stat-label">${label}</div>
+      <div class="stat-value ${cls}">${value}</div>
+    </div>`;
+
+  grid.innerHTML =
+    tile('Total Trades', trades.length) +
+    tile('Wins / Losses', `${wins} / ${trades.length - wins}`) +
+    tile('Targets Hit', `${targetsHit} / ${trades.length}`) +
+    tile('Net Realized P&amp;L', `$${totalPnl.toFixed(0)}`, totalPnl >= 0 ? 'pos' : 'neg') +
+    tile('Long Leg P&amp;L', `$${longPnl.toFixed(0)} (${longTrades.length} trades)`, longPnl >= 0 ? 'pos' : 'neg') +
+    tile('Short Leg P&amp;L', `$${shortPnl.toFixed(0)} (${shortTrades.length} trades)`, shortPnl >= 0 ? 'pos' : 'neg');
+}
+</script>
+
+</body>
+</html>
