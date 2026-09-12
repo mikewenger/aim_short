@@ -1,0 +1,30 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      # RAILWAY_TOKEN should be a Project Token (Railway project -> Settings ->
+      # Tokens), which scopes the CLI to that project/environment automatically.
+      # If the project has more than one service, also set the RAILWAY_SERVICE
+      # secret to the service name; otherwise `railway up` targets the project's
+      # single service on its own.
+      - name: Deploy to Railway
+        run: |
+          if [ -n "${{ secrets.RAILWAY_SERVICE }}" ]; then
+            railway up --service "${{ secrets.RAILWAY_SERVICE }}" --detach
+          else
+            railway up --detach
+          fi
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
