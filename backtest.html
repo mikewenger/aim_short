@@ -233,8 +233,8 @@
       <div class="method-card">
         <div class="card-title" style="margin-bottom:8px">Fill &amp; P&amp;L Logic</div>
         <ul>
-          <li>Entry price = <b>real</b> option price at the open of the first available tick at/after the signal bar closes</li>
-          <li>Intra-trade P&amp;L is marked from real option aggregate bars — <b>1-second bars if Massive returns them, otherwise 1-minute</b> (whichever was actually used is logged per trade)</li>
+          <li>Entry fills at the real <b>ask</b> of the first available bid/ask quote at/after the signal bar closes; the position is marked (and can exit) at the real <b>bid</b> from that point on — this models the bid/ask spread instead of assuming a fill at mid or last-trade price</li>
+          <li>Intra-trade P&amp;L is marked from Massive's real historical options <b>quotes</b> feed (nanosecond-precision bid/ask, not trade-aggregate bars)</li>
           <li>Position exits the instant marked P&amp;L reaches the profit target, or is force-closed at session end (0DTE) if the target is never hit — in that case the <b>maximum P&amp;L reached intraday</b> is reported alongside the actual (smaller) realized result</li>
           <li>If Massive can't supply real contract or price data at any step, the run <b>stops and reports the exact failure</b> instead of guessing</li>
         </ul>
@@ -280,7 +280,7 @@
               <th>Realized P&amp;L</th>
               <th>Max P&amp;L Reached</th>
               <th>Max P&amp;L Time (ET)</th>
-              <th>Fill Granularity</th>
+              <th>Quotes Used</th>
             </tr>
           </thead>
           <tbody id="tradesBody"></tbody>
@@ -462,50 +462,68 @@ async function findNearestContract(ticker, expirationDate, contractType, targetP
   return { ok: true, contract: best, error: null };
 }
 
-// Tries 1-second bars first, falls back to 1-minute. Returns { ok, bars, granularity, error }.
-async function fetchOptionIntraday(contractTicker, dateStr) {
-  for (const [mult, span] of [[1, 'second'], [1, 'minute']]) {
-    const url = `${BASE}/v2/aggs/ticker/${encodeURIComponent(contractTicker)}/range/${mult}/${span}/${dateStr}/${dateStr}?adjusted=true&sort=asc&limit=50000`;
+function nsFromMs(ms) { return (BigInt(Math.round(ms)) * 1000000n).toString(); }
+
+// Fetches real historical bid/ask quotes for one option contract over
+// [fromMs, toMs], paginating via next_url. Nanosecond-timestamp precision —
+// no fallback to trade aggregates: if Massive has no quotes here, we stop
+// rather than approximate off a last-trade print.
+async function fetchOptionQuotes(contractTicker, fromMs, toMs) {
+  let url = `${BASE}/v3/quotes/${encodeURIComponent(contractTicker)}?timestamp.gte=${nsFromMs(fromMs)}&timestamp.lte=${nsFromMs(toMs)}&order=asc&sort=timestamp&limit=50000`;
+  let all = [];
+  let pages = 0;
+  while (url && pages < 5) {
     const r = await fetchMassive(url);
-    if (r.ok && r.data && Array.isArray(r.data.results) && r.data.results.length) {
-      return { ok: true, bars: r.data.results, granularity: span, error: null };
-    }
-    if (!r.ok) addLog(`  ${span}-level fetch for ${contractTicker} failed: ${r.error} — trying next granularity if available`, 'warn');
+    if (!r.ok) return { ok: false, quotes: null, error: `quotes fetch failed (${r.error})` };
+    const results = (r.data && r.data.results) || [];
+    all = all.concat(results);
+    url = (r.data && r.data.next_url) || null;
+    pages++;
   }
-  return { ok: false, bars: null, granularity: null, error: `no 1-second or 1-minute price data returned for ${contractTicker} on ${dateStr}` };
+  if (!all.length) return { ok: false, quotes: null, error: `no bid/ask quotes returned for ${contractTicker} in the requested window` };
+  const quotes = all
+    .map(q => ({
+      tMs: Math.round(Number(q.sip_timestamp || q.participant_timestamp || 0) / 1e6),
+      bid: q.bid_price, ask: q.ask_price,
+    }))
+    .filter(q => q.bid != null && q.ask != null && q.tMs > 0)
+    .sort((a, b) => a.tMs - b.tMs);
+  if (!quotes.length) return { ok: false, quotes: null, error: `quotes returned but none had usable bid/ask fields` };
+  return { ok: true, quotes, error: null };
 }
 
 // ============================================================
 // TRADE SIMULATION FOR ONE ENTRY
 // ============================================================
-// bars: option intraday bars (t = start ms, o/h/l/c). entryTimeMs: earliest
-// eligible fill time. sessionEndMs: forced-close deadline.
-function simulateTrade(bars, entryTimeMs, sessionEndMs, contracts, target) {
-  const inWindow = bars.filter(b => b.t >= entryTimeMs && b.t <= sessionEndMs);
-  if (!inWindow.length) return { ok: false, error: 'no option ticks at/after the entry time within the session' };
+// Entry fills at the ASK (what a real buy pays); marks and exits at the BID
+// (what a real sell receives) — models the bid/ask spread instead of
+// pretending fills happen at a mid or last-trade price.
+function simulateTrade(quotes, entryTimeMs, sessionEndMs, contracts, target) {
+  const inWindow = quotes.filter(q => q.tMs >= entryTimeMs && q.tMs <= sessionEndMs);
+  if (!inWindow.length) return { ok: false, error: 'no bid/ask quotes at/after the entry time within the session' };
 
-  const entryPrice = inWindow[0].o != null ? inWindow[0].o : inWindow[0].c;
-  let maxPnl = -Infinity, maxPnlTime = inWindow[0].t;
+  const entryPrice = inWindow[0].ask;
+  let maxPnl = -Infinity, maxPnlTime = inWindow[0].tMs;
   let targetHit = false, exitPrice = null, exitTime = null;
 
-  for (const b of inWindow) {
-    const markPrice = b.c;
+  for (const q of inWindow) {
+    const markPrice = q.bid;
     const pnl = (markPrice - entryPrice) * 100 * contracts;
-    if (pnl > maxPnl) { maxPnl = pnl; maxPnlTime = b.t; }
+    if (pnl > maxPnl) { maxPnl = pnl; maxPnlTime = q.tMs; }
     if (pnl >= target) {
       targetHit = true;
       exitPrice = markPrice;
-      exitTime = b.t;
+      exitTime = q.tMs;
       break;
     }
   }
   if (!targetHit) {
     const last = inWindow[inWindow.length - 1];
-    exitPrice = last.c;
-    exitTime = last.t;
+    exitPrice = last.bid;
+    exitTime = last.tMs;
   }
   const realizedPnl = (exitPrice - entryPrice) * 100 * contracts;
-  return { ok: true, entryPrice, exitPrice, exitTime, targetHit, realizedPnl, maxPnl, maxPnlTime };
+  return { ok: true, entryPrice, exitPrice, exitTime, targetHit, realizedPnl, maxPnl, maxPnlTime, quoteCount: inWindow.length };
 }
 
 // ============================================================
@@ -660,14 +678,14 @@ async function executeLeg(leg, contractType, ticker, dateStr, underlyingPrice, e
   const contract = cRes.contract;
   addLog(`  → 1-OTM contract: ${contract.ticker} (strike $${contract.strike_price})`);
 
-  showProgress(`Fetching intraday prices for ${contract.ticker}...`);
-  const pxRes = await fetchOptionIntraday(contract.ticker, dateStr);
+  showProgress(`Fetching bid/ask quotes for ${contract.ticker}...`);
+  const pxRes = await fetchOptionQuotes(contract.ticker, entryTimeMs, sessionEndMs);
   if (!pxRes.ok) {
-    return { stop: true, error: `No real intraday price data for ${contract.ticker} on ${dateStr}: ${pxRes.error}. Stopping rather than simulating fills.` };
+    return { stop: true, error: `No real bid/ask quote data for ${contract.ticker} from ${fmtET(entryTimeMs)} to ${fmtET(sessionEndMs)} ET: ${pxRes.error}. Stopping rather than simulating fills.` };
   }
-  addLog(`  → ${pxRes.bars.length} ${pxRes.granularity}-level bars for ${contract.ticker}`);
+  addLog(`  → ${pxRes.quotes.length} bid/ask quotes for ${contract.ticker}`);
 
-  const sim = simulateTrade(pxRes.bars, entryTimeMs, sessionEndMs, contracts, target);
+  const sim = simulateTrade(pxRes.quotes, entryTimeMs, sessionEndMs, contracts, target);
   if (!sim.ok) {
     return { stop: true, error: `${contract.ticker}: ${sim.error}. Stopping rather than fabricating a fill.` };
   }
@@ -683,7 +701,7 @@ async function executeLeg(leg, contractType, ticker, dateStr, underlyingPrice, e
       exitTimeMs: sim.exitTime, exitPrice: sim.exitPrice,
       targetHit: sim.targetHit, realizedPnl: sim.realizedPnl,
       maxPnl: sim.maxPnl, maxPnlTime: sim.maxPnlTime,
-      granularity: pxRes.granularity,
+      quoteCount: sim.quoteCount,
     }
   };
 }
@@ -707,7 +725,7 @@ function renderTradesTable(trades) {
       <td style="color:${t.realizedPnl >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700">$${t.realizedPnl.toFixed(0)}</td>
       <td>$${t.maxPnl.toFixed(0)}</td>
       <td>${fmtET(t.maxPnlTime)} ET</td>
-      <td>${t.granularity}</td>
+      <td>${t.quoteCount}</td>
     </tr>
   `).join('');
   document.getElementById('resultsSection').style.display = 'block';
